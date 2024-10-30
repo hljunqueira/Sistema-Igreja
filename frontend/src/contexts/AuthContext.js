@@ -1,47 +1,82 @@
-// src/contexts/AuthContext.js
 import React, { createContext, useState, useContext, useEffect } from "react";
-import api from "../services/api"; // Certifique-se de que este caminho está correto
+import { api } from "../services/api";
 
-const AuthContext = createContext(null);
+const AuthContext = createContext({});
 
-export const AuthProvider = ({ children }) => {
+export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    const loadStoredAuth = async () => {
-      const storedToken = localStorage.getItem("authToken");
-      if (storedToken) {
-        try {
-          api.defaults.headers.common[
-            "Authorization"
-          ] = `Bearer ${storedToken}`;
-          const response = await api.get("/user"); // Ajuste esta rota conforme sua API
-          setUser(response.data);
-        } catch (err) {
-          console.error("Erro ao carregar usuário:", err);
-          localStorage.removeItem("authToken");
+    const loadStorageData = async () => {
+      try {
+        const storedToken = localStorage.getItem("@App:token");
+        const storedUser = localStorage.getItem("@App:user");
+
+        if (storedToken && storedUser) {
+          api.defaults.headers.Authorization = `Bearer ${storedToken}`;
+          setUser(JSON.parse(storedUser));
         }
+      } catch (err) {
+        console.error("Erro ao carregar dados do storage:", err);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
 
-    loadStoredAuth();
+    loadStorageData();
   }, []);
 
   const login = async (email, password) => {
     try {
-      setError(null);
       setLoading(true);
-      const response = await api.post("/login", { email, password }); // Ajuste esta rota conforme sua API
-      const { token, user } = response.data;
-      localStorage.setItem("authToken", token);
-      api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
-      setUser(user);
+      setError("");
+
+      const response = await api.post("/auth/login", { email, password });
+
+      const { token, user: userData } = response.data;
+
+      localStorage.setItem("@App:token", token);
+      localStorage.setItem("@App:user", JSON.stringify(userData));
+
+      api.defaults.headers.Authorization = `Bearer ${token}`;
+
+      setUser(userData);
       return true;
     } catch (err) {
-      setError(err.response?.data?.message || "Erro ao fazer login");
+      const message = err.response?.data?.message || "Erro ao realizar login";
+      setError(message);
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const register = async (name, email, password) => {
+    try {
+      setLoading(true);
+      setError("");
+
+      const response = await api.post("/auth/register", {
+        name,
+        email,
+        password,
+      });
+
+      const { token, user: userData } = response.data;
+
+      localStorage.setItem("@App:token", token);
+      localStorage.setItem("@App:user", JSON.stringify(userData));
+
+      api.defaults.headers.Authorization = `Bearer ${token}`;
+
+      setUser(userData);
+      return true;
+    } catch (err) {
+      const message =
+        err.response?.data?.message || "Erro ao realizar registro";
+      setError(message);
       return false;
     } finally {
       setLoading(false);
@@ -49,39 +84,88 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = () => {
-    localStorage.removeItem("authToken");
-    api.defaults.headers.common["Authorization"] = "";
+    localStorage.removeItem("@App:token");
+    localStorage.removeItem("@App:user");
+    api.defaults.headers.Authorization = undefined;
     setUser(null);
   };
 
-  const updateUser = async (userData) => {
+  const updateProfile = async (userData) => {
     try {
-      setError(null);
       setLoading(true);
-      const response = await api.put("/user", userData); // Ajuste esta rota conforme sua API
-      setUser(response.data);
+      const response = await api.put("/users/profile", userData);
+
+      const updatedUser = response.data;
+      localStorage.setItem("@App:user", JSON.stringify(updatedUser));
+      setUser(updatedUser);
+
       return true;
     } catch (err) {
-      setError(err.response?.data?.message || "Erro ao atualizar usuário");
+      const message = err.response?.data?.message || "Erro ao atualizar perfil";
+      setError(message);
       return false;
     } finally {
       setLoading(false);
     }
   };
 
+  const forgotPassword = async (email) => {
+    try {
+      setLoading(true);
+      await api.post("/auth/forgot-password", { email });
+      return true;
+    } catch (err) {
+      const message = err.response?.data?.message || "Erro ao recuperar senha";
+      setError(message);
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const resetPassword = async (token, password) => {
+    try {
+      setLoading(true);
+      await api.post("/auth/reset-password", { token, password });
+      return true;
+    } catch (err) {
+      const message = err.response?.data?.message || "Erro ao redefinir senha";
+      setError(message);
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const clearError = () => {
+    setError("");
+  };
+
   return (
     <AuthContext.Provider
-      value={{ user, loading, error, login, logout, updateUser }}
+      value={{
+        signed: !!user,
+        user,
+        loading,
+        error,
+        login,
+        register,
+        logout,
+        updateProfile,
+        forgotPassword,
+        resetPassword,
+        clearError,
+      }}
     >
       {children}
     </AuthContext.Provider>
   );
-};
+}
 
-export const useAuth = () => {
+export function useAuth() {
   const context = useContext(AuthContext);
   if (!context) {
     throw new Error("useAuth deve ser usado dentro de um AuthProvider");
   }
   return context;
-};
+}

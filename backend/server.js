@@ -1,58 +1,72 @@
 require("dotenv").config();
 const express = require("express");
-const bcrypt = require("bcryptjs");
-const jwt = require("jsonwebtoken");
 const cors = require("cors");
-const https = require("https");
-const fs = require("fs");
-const path = require("path");
+const rateLimit = require("express-rate-limit");
 const pool = require("./config/db");
 const { createUserTable } = require("./models/User");
-const app = express();
-const PORT = process.env.PORT || 3001;
-const rateLimit = require("express-rate-limit");
-
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutos
-  max: 100, // limite de 100 requisições por IP
-});
-
-app.use(limiter);
-
-// Middleware
-app.use(cors());
-app.use(express.json());
+const { createMemberTable } = require("./models/Member");
 
 // Importar rotas
 const authRoutes = require("./routes/authRoutes");
+const memberRoutes = require("./routes/memberRoutes");
 
-// Usar rotas
+const app = express();
+const PORT = process.env.PORT || 3001;
+
+// Configurar rate limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutos
+  max: 100, // limite de 100 requisições por IP
+  message: "Muitas requisições deste IP, tente novamente mais tarde.",
+});
+
+// Middleware
+app.use(limiter);
+app.use(cors());
+app.use(express.json());
+
+// Rotas de API
 app.use("/api", authRoutes);
+app.use("/api/members", memberRoutes);
 
-// Rota de teste (GET)
+// Rota de teste
 app.get("/", (req, res) => {
   res.send("Servidor backend funcionando!");
 });
 
-// Configuração HTTPS
-const httpsOptions = {
-  key: fs.readFileSync(
-    path.join(__dirname, "certificates", "localhost-key.pem")
-  ),
-  cert: fs.readFileSync(path.join(__dirname, "certificates", "localhost.pem")),
-};
-
-// Criar servidor HTTPS
-const server = https.createServer(httpsOptions, app);
-
-// Inicie o servidor
-server.listen(PORT, async () => {
-  console.log(`Servidor HTTPS rodando na porta ${PORT}`);
-
+// Função para inicializar o banco de dados
+async function initializeDatabase() {
   try {
     await createUserTable();
-    console.log("Tabela de usuários criada com sucesso!");
+    await createMemberTable();
+    console.log("Tabelas criadas com sucesso!");
   } catch (error) {
-    console.error("Erro ao criar tabela de usuários:", error);
+    console.error("Erro ao criar tabelas:", error);
+    process.exit(1); // Encerra o processo em caso de erro crítico
   }
+}
+
+// Iniciar servidor
+const startServer = async () => {
+  try {
+    // Inicializar banco de dados
+    await initializeDatabase();
+
+    // Iniciar servidor HTTP
+    app.listen(PORT, () => {
+      console.log(`Servidor HTTP rodando na porta ${PORT}`);
+    });
+  } catch (error) {
+    console.error("Erro ao iniciar servidor:", error);
+    process.exit(1);
+  }
+};
+
+// Tratamento de erros não capturados
+process.on("unhandledRejection", (error) => {
+  console.error("Erro não tratado:", error);
+  process.exit(1);
 });
+
+// Iniciar aplicação
+startServer();

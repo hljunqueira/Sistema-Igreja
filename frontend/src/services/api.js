@@ -1,161 +1,60 @@
-// src/services/api.js
 import axios from "axios";
 
-const api = axios.create({
-  baseURL: "https://localhost:3001/api", // Substitua pela URL base da sua API
+export const api = axios.create({
+  baseURL: process.env.REACT_APP_API_URL || "http://localhost:3001/api",
+  timeout: 10000,
 });
 
-export default api;
-// frontend/src/services/api.js
+// Interceptor para adicionar token em todas as requisições
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem("@App:token");
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
 
-const API_URL = "https://localhost:3001/api";
+// Interceptor para tratamento de erros
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const originalRequest = error.config;
 
-// Função de login
-export const loginUser = async (email, password) => {
-  try {
-    const response = await fetch(`${API_URL}/login`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ email, password }),
-    });
+    // Se o erro for 401 (não autorizado) e não for uma tentativa de refresh
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true;
 
-    const data = await response.json();
+      try {
+        // Tentar renovar o token
+        const response = await api.post("/auth/refresh-token");
+        const { token } = response.data;
 
-    if (!response.ok) {
-      throw new Error(data.message || "Erro ao fazer login");
+        localStorage.setItem("@App:token", token);
+        api.defaults.headers.Authorization = `Bearer ${token}`;
+
+        // Repetir a requisição original com o novo token
+        return api(originalRequest);
+      } catch (refreshError) {
+        // Se não conseguir renovar o token, fazer logout
+        localStorage.removeItem("@App:token");
+        localStorage.removeItem("@App:user");
+        window.location.href = "/login";
+      }
     }
 
-    return data;
-  } catch (error) {
-    throw error;
+    return Promise.reject(error);
   }
-};
+);
 
-// Função de registro
-export const registerUser = async (name, email, password) => {
-  try {
-    const response = await fetch(`${API_URL}/register`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ name, email, password }),
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(data.message || "Erro ao registrar usuário");
-    }
-
-    return data;
-  } catch (error) {
-    throw error;
-  }
-};
-
-// Função para obter dados do usuário
-export const getUserData = async (token) => {
-  try {
-    const response = await fetch(`${API_URL}/user`, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(data.message || "Erro ao obter dados do usuário");
-    }
-
-    return data;
-  } catch (error) {
-    throw error;
-  }
-};
-
-// Função para atualizar dados do usuário
-export const updateUserData = async (token, userData) => {
-  try {
-    const response = await fetch(`${API_URL}/user`, {
-      method: "PUT",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(userData),
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(data.message || "Erro ao atualizar dados do usuário");
-    }
-
-    return data;
-  } catch (error) {
-    throw error;
-  }
-};
-
-// Função para solicitar redefinição de senha
-export const forgotPassword = async (email) => {
-  try {
-    const response = await fetch(`${API_URL}/forgot-password`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ email }),
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(data.message || "Erro ao solicitar redefinição de senha");
-    }
-
-    return data;
-  } catch (error) {
-    throw error;
-  }
-};
-
-// Função auxiliar para verificar se o token está válido
-export const checkAuthToken = async (token) => {
-  try {
-    const response = await fetch(`${API_URL}/verify-token`, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-    });
-
-    return response.ok;
-  } catch (error) {
-    return false;
-  }
-};
-
-// Função para fazer logout (limpar token no backend se necessário)
-export const logoutUser = async (token) => {
-  try {
-    const response = await fetch(`${API_URL}/logout`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-    });
-
-    return response.ok;
-  } catch (error) {
-    throw error;
+export const setAuthToken = (token) => {
+  if (token) {
+    api.defaults.headers.Authorization = `Bearer ${token}`;
+  } else {
+    delete api.defaults.headers.Authorization;
   }
 };

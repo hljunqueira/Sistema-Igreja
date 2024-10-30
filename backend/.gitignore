@@ -2,3 +2,5 @@
 # Ignore SSL certificates
 /certificates
 *.pem
+uploads/*
+!uploads/.gitkeep
