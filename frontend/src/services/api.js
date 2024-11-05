@@ -1,11 +1,22 @@
 import axios from "axios";
 
 export const api = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || "http://localhost:3001/api",
-  timeout: 10000,
+  baseURL: "http://localhost:3001/api",
+  headers: {
+    "Content-Type": "application/json",
+  },
 });
 
-// Interceptor para adicionar token em todas as requisições
+// Função para definir o token de autenticação
+export const setAuthToken = (token) => {
+  if (token) {
+    api.defaults.headers.Authorization = `Bearer ${token}`;
+  } else {
+    delete api.defaults.headers.Authorization;
+  }
+};
+
+// Interceptor para adicionar token
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem("@App:token");
@@ -35,7 +46,7 @@ api.interceptors.response.use(
         const { token } = response.data;
 
         localStorage.setItem("@App:token", token);
-        api.defaults.headers.Authorization = `Bearer ${token}`;
+        setAuthToken(token);
 
         // Repetir a requisição original com o novo token
         return api(originalRequest);
@@ -51,10 +62,15 @@ api.interceptors.response.use(
   }
 );
 
-export const setAuthToken = (token) => {
-  if (token) {
-    api.defaults.headers.Authorization = `Bearer ${token}`;
-  } else {
-    delete api.defaults.headers.Authorization;
-  }
+export const dashboardService = {
+  getDashboardData: async () => {
+    try {
+      const response = await api.get("/dashboard");
+      return response.data;
+    } catch (error) {
+      throw new Error(
+        error.response?.data?.message || "Erro ao buscar dados do dashboard"
+      );
+    }
+  },
 };

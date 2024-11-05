@@ -1,3 +1,4 @@
+// frontend/src/contexts/AuthContext.js
 import React, { createContext, useState, useContext, useEffect } from "react";
 import { api } from "../services/api";
 
@@ -10,19 +11,15 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     const loadStorageData = async () => {
-      try {
-        const storedToken = localStorage.getItem("@App:token");
-        const storedUser = localStorage.getItem("@App:user");
+      const storedToken = localStorage.getItem("@App:token");
+      const storedUser = localStorage.getItem("@App:user");
 
-        if (storedToken && storedUser) {
-          api.defaults.headers.Authorization = `Bearer ${storedToken}`;
-          setUser(JSON.parse(storedUser));
-        }
-      } catch (err) {
-        console.error("Erro ao carregar dados do storage:", err);
-      } finally {
-        setLoading(false);
+      if (storedToken && storedUser) {
+        api.defaults.headers.Authorization = `Bearer ${storedToken}`;
+        setUser(JSON.parse(storedUser));
       }
+
+      setLoading(false);
     };
 
     loadStorageData();
@@ -35,18 +32,17 @@ export function AuthProvider({ children }) {
 
       const response = await api.post("/auth/login", { email, password });
 
-      const { token, user: userData } = response.data;
+      const { token, user } = response.data;
 
       localStorage.setItem("@App:token", token);
-      localStorage.setItem("@App:user", JSON.stringify(userData));
+      localStorage.setItem("@App:user", JSON.stringify(user));
 
       api.defaults.headers.Authorization = `Bearer ${token}`;
 
-      setUser(userData);
+      setUser(user);
       return true;
     } catch (err) {
-      const message = err.response?.data?.message || "Erro ao realizar login";
-      setError(message);
+      setError(err.response?.data?.message || "Erro ao realizar login");
       return false;
     } finally {
       setLoading(false);
@@ -64,19 +60,17 @@ export function AuthProvider({ children }) {
         password,
       });
 
-      const { token, user: userData } = response.data;
+      const { token, user } = response.data;
 
       localStorage.setItem("@App:token", token);
-      localStorage.setItem("@App:user", JSON.stringify(userData));
+      localStorage.setItem("@App:user", JSON.stringify(user));
 
       api.defaults.headers.Authorization = `Bearer ${token}`;
 
-      setUser(userData);
+      setUser(user);
       return true;
     } catch (err) {
-      const message =
-        err.response?.data?.message || "Erro ao realizar registro";
-      setError(message);
+      setError(err.response?.data?.message || "Erro ao realizar registro");
       return false;
     } finally {
       setLoading(false);
@@ -93,45 +87,26 @@ export function AuthProvider({ children }) {
   const updateProfile = async (userData) => {
     try {
       setLoading(true);
-      const response = await api.put("/users/profile", userData);
+      setError("");
 
-      const updatedUser = response.data;
+      const response = await api.put("/auth/profile", userData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+
+      const updatedUser = response.data.user;
+
       localStorage.setItem("@App:user", JSON.stringify(updatedUser));
       setUser(updatedUser);
 
-      return true;
-    } catch (err) {
-      const message = err.response?.data?.message || "Erro ao atualizar perfil";
-      setError(message);
-      return false;
-    } finally {
-      setLoading(false);
-    }
-  };
+      console.log("Perfil atualizado:", updatedUser);
 
-  const forgotPassword = async (email) => {
-    try {
-      setLoading(true);
-      await api.post("/auth/forgot-password", { email });
-      return true;
+      return updatedUser;
     } catch (err) {
-      const message = err.response?.data?.message || "Erro ao recuperar senha";
-      setError(message);
-      return false;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const resetPassword = async (token, password) => {
-    try {
-      setLoading(true);
-      await api.post("/auth/reset-password", { token, password });
-      return true;
-    } catch (err) {
-      const message = err.response?.data?.message || "Erro ao redefinir senha";
-      setError(message);
-      return false;
+      console.error("Erro ao atualizar perfil:", err);
+      setError(err.response?.data?.message || "Erro ao atualizar perfil");
+      throw err;
     } finally {
       setLoading(false);
     }
@@ -152,8 +127,6 @@ export function AuthProvider({ children }) {
         register,
         logout,
         updateProfile,
-        forgotPassword,
-        resetPassword,
         clearError,
       }}
     >

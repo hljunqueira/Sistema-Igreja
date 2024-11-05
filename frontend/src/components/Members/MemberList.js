@@ -1,19 +1,24 @@
-// src/components/Members/MemberList.js
-
+// frontend/src/components/Members/MemberList.js
 import React, { useState, useEffect } from "react";
 import {
+  Container,
+  Typography,
+  Button,
+  Paper,
   Table,
   TableBody,
   TableCell,
   TableContainer,
   TableHead,
   TableRow,
-  Paper,
-  Button,
-  Typography,
+  IconButton,
   CircularProgress,
+  Alert,
 } from "@mui/material";
 import { Link } from "react-router-dom";
+import EditIcon from "@mui/icons-material/Edit";
+import DeleteIcon from "@mui/icons-material/Delete";
+import AddIcon from "@mui/icons-material/Add";
 import { api } from "../../services/api";
 
 function MemberList() {
@@ -22,46 +27,70 @@ function MemberList() {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    const fetchMembers = async () => {
-      try {
-        setLoading(true);
-        const response = await api.get("/members");
-        setMembers(response.data);
-        setLoading(false);
-      } catch (error) {
-        console.error("Erro ao buscar membros:", error);
-        setError(
-          "Erro ao carregar membros. Por favor, tente novamente mais tarde."
-        );
-        setLoading(false);
-      }
-    };
-
     fetchMembers();
   }, []);
 
-  if (loading) {
-    return <CircularProgress />;
-  }
+  const fetchMembers = async () => {
+    try {
+      const response = await api.get("/members");
+      setMembers(response.data);
+      setError(null);
+    } catch (err) {
+      setError("Erro ao carregar membros: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  if (error) {
-    return <Typography color="error">{error}</Typography>;
+  const handleDelete = async (id) => {
+    if (window.confirm("Tem certeza que deseja excluir este membro?")) {
+      try {
+        await api.delete(`/members/${id}`);
+        setMembers(members.filter((member) => member.id !== id));
+      } catch (err) {
+        setError("Erro ao excluir membro: " + err.message);
+      }
+    }
+  };
+
+  if (loading) {
+    return (
+      <Container sx={{ display: "flex", justifyContent: "center", mt: 4 }}>
+        <CircularProgress />
+      </Container>
+    );
   }
 
   return (
-    <div>
-      <Typography variant="h4" gutterBottom>
-        Lista de Membros
-      </Typography>
-      <Button
-        component={Link}
-        to="/members/new"
-        variant="contained"
-        color="primary"
-        style={{ marginBottom: "20px" }}
+    <Container maxWidth="lg" sx={{ mt: 4 }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: "20px",
+        }}
       >
-        Adicionar Novo Membro
-      </Button>
+        <Typography variant="h4" component="h1">
+          Membros
+        </Typography>
+        <Button
+          component={Link}
+          to="/members/add"
+          variant="contained"
+          color="primary"
+          startIcon={<AddIcon />}
+        >
+          Adicionar Membro
+        </Button>
+      </div>
+
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
+      )}
+
       <TableContainer component={Paper}>
         <Table>
           <TableHead>
@@ -69,6 +98,7 @@ function MemberList() {
               <TableCell>Nome</TableCell>
               <TableCell>Email</TableCell>
               <TableCell>Telefone</TableCell>
+              <TableCell>Endereço</TableCell>
               <TableCell>Ações</TableCell>
             </TableRow>
           </TableHead>
@@ -78,31 +108,28 @@ function MemberList() {
                 <TableCell>{member.name}</TableCell>
                 <TableCell>{member.email}</TableCell>
                 <TableCell>{member.phone}</TableCell>
+                <TableCell>{member.address}</TableCell>
                 <TableCell>
-                  <Button
+                  <IconButton
                     component={Link}
-                    to={`/members/${member.id}`}
-                    variant="outlined"
+                    to={`/members/edit/${member.id}`}
                     color="primary"
-                    style={{ marginRight: "10px" }}
                   >
-                    Ver
-                  </Button>
-                  <Button
-                    component={Link}
-                    to={`/members/${member.id}/edit`}
-                    variant="outlined"
-                    color="secondary"
+                    <EditIcon />
+                  </IconButton>
+                  <IconButton
+                    color="error"
+                    onClick={() => handleDelete(member.id)}
                   >
-                    Editar
-                  </Button>
+                    <DeleteIcon />
+                  </IconButton>
                 </TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
       </TableContainer>
-    </div>
+    </Container>
   );
 }
 

@@ -4,18 +4,7 @@ const router = express.Router();
 const pool = require("../config/db");
 const authMiddleware = require("../middleware/authMiddleware");
 
-// Listar todos os membros
-router.get("/", authMiddleware, async (req, res) => {
-  try {
-    const result = await pool.query("SELECT * FROM members ORDER BY name ASC");
-    res.json(result.rows);
-  } catch (error) {
-    console.error("Erro ao listar membros:", error);
-    res.status(500).json({ message: "Erro ao listar membros" });
-  }
-});
-
-// Criar novo membro (versão atualizada)
+// Rota para adicionar um novo membro
 router.post("/", authMiddleware, async (req, res) => {
   try {
     const {
@@ -25,41 +14,61 @@ router.post("/", authMiddleware, async (req, res) => {
       address,
       birthDate,
       baptismDate,
-      maritalStatus,
-      spouse,
-      children,
-      occupation,
-      notes,
+      observations,
     } = req.body;
 
     const result = await pool.query(
       `INSERT INTO members 
-       (name, email, phone, address, birth_date, baptism_date, marital_status, spouse, children, occupation, notes) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) 
+       (name, email, phone, address, birth_date, baptism_date, observations) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7) 
        RETURNING *`,
-      [
-        name,
-        email,
-        phone,
-        address,
-        birthDate,
-        baptismDate,
-        maritalStatus,
-        spouse,
-        children,
-        occupation,
-        notes,
-      ]
+      [name, email, phone, address, birthDate, baptismDate, observations]
     );
 
     res.status(201).json(result.rows[0]);
   } catch (error) {
-    console.error("Erro ao criar membro:", error);
-    res.status(500).json({ message: "Erro ao criar membro" });
+    console.error("Erro ao adicionar membro:", error);
+    res
+      .status(500)
+      .json({ message: "Erro ao adicionar membro", error: error.message });
   }
 });
 
-// Atualizar membro
+// Rota para obter todos os membros
+router.get("/", authMiddleware, async (req, res) => {
+  try {
+    const result = await pool.query("SELECT * FROM members ORDER BY name");
+    res.json(result.rows);
+  } catch (error) {
+    console.error("Erro ao buscar membros:", error);
+    res
+      .status(500)
+      .json({ message: "Erro ao buscar membros", error: error.message });
+  }
+});
+
+// Rota para obter um membro específico
+router.get("/:id", authMiddleware, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await pool.query("SELECT * FROM members WHERE id = $1", [
+      id,
+    ]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: "Membro não encontrado" });
+    }
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error("Erro ao buscar membro:", error);
+    res
+      .status(500)
+      .json({ message: "Erro ao buscar membro", error: error.message });
+  }
+});
+
+// Rota para atualizar um membro
 router.put("/:id", authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
@@ -70,35 +79,17 @@ router.put("/:id", authMiddleware, async (req, res) => {
       address,
       birthDate,
       baptismDate,
-      maritalStatus,
-      spouse,
-      children,
-      occupation,
-      notes,
+      observations,
     } = req.body;
 
     const result = await pool.query(
       `UPDATE members 
-       SET name = $1, email = $2, phone = $3, 
-           address = $4, birth_date = $5, baptism_date = $6,
-           marital_status = $7, spouse = $8, children = $9,
-           occupation = $10, notes = $11
-       WHERE id = $12 
+       SET name = $1, email = $2, phone = $3, address = $4, 
+           birth_date = $5, baptism_date = $6, observations = $7,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $8 
        RETURNING *`,
-      [
-        name,
-        email,
-        phone,
-        address,
-        birthDate,
-        baptismDate,
-        maritalStatus,
-        spouse,
-        children,
-        occupation,
-        notes,
-        id,
-      ]
+      [name, email, phone, address, birthDate, baptismDate, observations, id]
     );
 
     if (result.rows.length === 0) {
@@ -108,11 +99,13 @@ router.put("/:id", authMiddleware, async (req, res) => {
     res.json(result.rows[0]);
   } catch (error) {
     console.error("Erro ao atualizar membro:", error);
-    res.status(500).json({ message: "Erro ao atualizar membro" });
+    res
+      .status(500)
+      .json({ message: "Erro ao atualizar membro", error: error.message });
   }
 });
 
-// Deletar membro
+// Rota para deletar um membro
 router.delete("/:id", authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
@@ -128,7 +121,9 @@ router.delete("/:id", authMiddleware, async (req, res) => {
     res.json({ message: "Membro deletado com sucesso" });
   } catch (error) {
     console.error("Erro ao deletar membro:", error);
-    res.status(500).json({ message: "Erro ao deletar membro" });
+    res
+      .status(500)
+      .json({ message: "Erro ao deletar membro", error: error.message });
   }
 });
 

@@ -1,8 +1,9 @@
+// frontend/src/App.js
 import React from "react";
 import {
   BrowserRouter as Router,
-  Route,
   Routes,
+  Route,
   Navigate,
 } from "react-router-dom";
 import { ThemeProvider } from "@mui/material/styles";
@@ -10,26 +11,30 @@ import CssBaseline from "@mui/material/CssBaseline";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import theme from "./theme";
 
-// Importe seus componentes
+// Componentes
 import Login from "./components/Login/Login";
 import Register from "./components/Register/Register";
 import Dashboard from "./components/Dashboard/Dashboard";
 import Profile from "./components/Profile/Profile";
 import Navigation from "./components/Navigation/Navigation";
-import NotFound from "./components/NotFound/NotFound";
 import MemberList from "./components/Members/MemberList";
-import "./App.css";
+import AddMember from "./components/Members/AddMember";
+import EditMember from "./components/Members/EditMember";
+import NotFound from "./components/NotFound/NotFound";
 
-// Componente PrivateRoute
+// Componentes Admin
+import AdminDashboard from "./components/Admin/AdminDashboard";
+import AdminMembers from "./components/Admin/AdminMembers";
+import AdminEvents from "./components/Admin/AdminEvents";
+import AdminMinistries from "./components/Admin/AdminMinistries";
+import AdminFinance from "./components/Admin/AdminFinance";
+import AdminSettings from "./components/Admin/AdminSettings";
+
+import AdminRoute from "./components/Routes/AdminRoute";
+
 const PrivateRoute = ({ children }) => {
-  const { signed } = useAuth();
-  return signed ? children : <Navigate to="/login" />;
-};
-
-// Componente PublicRoute
-const PublicRoute = ({ children }) => {
-  const { signed } = useAuth();
-  return !signed ? children : <Navigate to="/dashboard" />;
+  const { user } = useAuth();
+  return user ? children : <Navigate to="/login" />;
 };
 
 function App() {
@@ -43,22 +48,8 @@ function App() {
             <main className="main-content">
               <Routes>
                 {/* Rotas Públicas */}
-                <Route
-                  path="/login"
-                  element={
-                    <PublicRoute>
-                      <Login />
-                    </PublicRoute>
-                  }
-                />
-                <Route
-                  path="/register"
-                  element={
-                    <PublicRoute>
-                      <Register />
-                    </PublicRoute>
-                  }
-                />
+                <Route path="/login" element={<Login />} />
+                <Route path="/register" element={<Register />} />
 
                 {/* Rotas Privadas */}
                 <Route
@@ -85,14 +76,78 @@ function App() {
                     </PrivateRoute>
                   }
                 />
+                <Route
+                  path="/members/add"
+                  element={
+                    <PrivateRoute>
+                      <AddMember />
+                    </PrivateRoute>
+                  }
+                />
+                <Route
+                  path="/members/edit/:id"
+                  element={
+                    <PrivateRoute>
+                      <EditMember />
+                    </PrivateRoute>
+                  }
+                />
 
-                {/* Rota inicial */}
+                {/* Rotas Administrativas */}
+                <Route
+                  path="/admin"
+                  element={
+                    <AdminRoute>
+                      <AdminDashboard />
+                    </AdminRoute>
+                  }
+                />
+                <Route
+                  path="/admin/members"
+                  element={
+                    <AdminRoute>
+                      <AdminMembers />
+                    </AdminRoute>
+                  }
+                />
+                <Route
+                  path="/admin/events"
+                  element={
+                    <AdminRoute>
+                      <AdminEvents />
+                    </AdminRoute>
+                  }
+                />
+                <Route
+                  path="/admin/ministries"
+                  element={
+                    <AdminRoute>
+                      <AdminMinistries />
+                    </AdminRoute>
+                  }
+                />
+                <Route
+                  path="/admin/finance"
+                  element={
+                    <AdminRoute>
+                      <AdminFinance />
+                    </AdminRoute>
+                  }
+                />
+                <Route
+                  path="/admin/settings"
+                  element={
+                    <AdminRoute>
+                      <AdminSettings />
+                    </AdminRoute>
+                  }
+                />
+
+                {/* Outras rotas */}
                 <Route
                   path="/"
                   element={<Navigate to="/dashboard" replace />}
                 />
-
-                {/* Rota 404 */}
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </main>
