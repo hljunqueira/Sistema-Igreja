@@ -1,6 +1,7 @@
-// backend/controllers/userController.js
 const { pool } = require("../config/db");
 const cloudinary = require("../config/cloudinary");
+const fs = require("fs");
+const path = require("path");
 
 // Função para obter o perfil do usuário
 exports.getUserProfile = async (req, res) => {
@@ -92,11 +93,16 @@ exports.updateUserProfile = async (req, res) => {
 exports.updateProfileImage = async (req, res) => {
   const client = await pool.connect();
   try {
+    console.log("Iniciando updateProfileImage");
+    console.log("Arquivo recebido:", req.file);
+
     if (!req.file) {
       return res.status(400).json({ message: "Nenhuma imagem fornecida" });
     }
 
     const userId = req.user.id;
+    const filePath = path.resolve(req.file.path);
+    console.log("Caminho completo do arquivo:", filePath);
 
     // Buscar usuário atual
     const userResult = await client.query(
@@ -119,23 +125,52 @@ exports.updateProfileImage = async (req, res) => {
       }
     }
 
+    // Upload para o Cloudinary com transformações
+    console.log("Iniciando upload para Cloudinary");
+    const result = await cloudinary.uploader.upload(filePath, {
+      folder: "profile-images",
+      transformation: [
+        { width: 500, height: 500, crop: "limit" },
+        { quality: "auto" },
+        { fetch_format: "auto" },
+      ],
+    });
+    console.log("Resultado do upload Cloudinary:", result);
+
     // Atualizar o usuário com a nova URL da imagem
     const updateResult = await client.query(
       `UPDATE users 
-       SET profile_image_url = $1, profile_image_id = $2, updated_at = CURRENT_TIMESTAMP 
-       WHERE id = $3 RETURNING *`,
-      [req.file.path, req.file.filename, userId]
+       SET profile_image_url = $1, 
+           profile_image_id = $2,
+           updated_at = CURRENT_TIMESTAMP 
+       WHERE id = $3 
+       RETURNING *`,
+      [result.secure_url, result.public_id, userId]
     );
+
+    // Remover o arquivo temporário após o upload
+    try {
+      await fs.promises.unlink(filePath);
+      console.log("Arquivo temporário removido com sucesso");
+    } catch (unlinkError) {
+      console.error("Erro ao remover arquivo temporário:", unlinkError);
+    }
+
+    if (updateResult.rows.length === 0) {
+      return res.status(404).json({ message: "Usuário não encontrado" });
+    }
 
     res.json({
       message: "Imagem de perfil atualizada com sucesso",
+      imageUrl: result.secure_url,
       user: updateResult.rows[0],
     });
   } catch (error) {
-    console.error("Erro ao atualizar imagem de perfil:", error);
+    console.error("Erro detalhado ao atualizar imagem de perfil:", error);
     res.status(500).json({
       message: "Erro ao atualizar imagem de perfil",
-      error: process.env.NODE_ENV === "development" ? error.message : undefined,
+      error:
+        process.env.NODE_ENV === "development" ? error.toString() : undefined,
     });
   } finally {
     client.release();
@@ -220,4 +255,4 @@ exports.deleteUserAccount = async (req, res) => {
   }
 };
 
-// ... resto do código existente, se houver ...
+// Outras funções do controlador, se houver...

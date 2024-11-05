@@ -1,4 +1,3 @@
-// src/components/Navigation/Navigation.js
 import React from "react";
 import {
   AppBar,
@@ -9,13 +8,19 @@ import {
   Box,
 } from "@mui/material";
 import { Brightness4, Brightness7 } from "@mui/icons-material";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom"; // Importar useNavigate
 import { useAuth } from "../../contexts/AuthContext";
 import { useTheme } from "../../contexts/ThemeContext";
 
 function Navigation() {
   const { user, logout } = useAuth(); // Obtém informações do usuário e a função de logout do contexto de autenticação
   const { darkMode, toggleDarkMode } = useTheme(); // Obtém o estado do modo escuro e a função para alterná-lo
+  const navigate = useNavigate(); // Inicializar useNavigate
+
+  const handleLogout = () => {
+    logout(); // Chama a função de logout
+    navigate("/login"); // Redireciona para a página de login
+  };
 
   return (
     <AppBar position="static">
@@ -50,7 +55,9 @@ function Navigation() {
               <Button color="inherit" component={Link} to="/profile">
                 Perfil
               </Button>
-              <Button color="inherit" onClick={logout}>
+              <Button color="inherit" onClick={handleLogout}>
+                {" "}
+                {/* Alterar para usar handleLogout */}
                 Sair
               </Button>
             </>

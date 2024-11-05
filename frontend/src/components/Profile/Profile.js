@@ -59,19 +59,16 @@ function Profile() {
       setFormData((prev) => ({
         ...prev,
         ...response.data,
-        // Garantir que address sempre tenha uma estrutura válida
         address: {
           street: response.data.address?.street || "",
           city: response.data.address?.city || "",
           state: response.data.address?.state || "",
           zipCode: response.data.address?.zipCode || "",
         },
-        // Garantir que notifications_preferences sempre tenha uma estrutura válida
         notifications_preferences: {
           email: response.data.notifications_preferences?.email ?? true,
           push: response.data.notifications_preferences?.push ?? true,
         },
-        // Garantir que outros campos tenham valores padrão se forem nulos
         name: response.data.name || "",
         email: response.data.email || "",
         phone: response.data.phone || "",
@@ -131,12 +128,15 @@ function Profile() {
       const response = await api.post("/user/profile/image", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
+
       setFormData((prev) => ({
         ...prev,
         profile_image_url: response.data.imageUrl,
       }));
+
       showSnackbar("Foto de perfil atualizada com sucesso!", "success");
     } catch (error) {
+      console.error("Erro ao atualizar foto de perfil:", error);
       showSnackbar("Erro ao atualizar foto de perfil", "error");
     } finally {
       setSaving(false);
@@ -151,7 +151,6 @@ function Profile() {
       setFormData((prev) => ({
         ...prev,
         ...response.data,
-        // Garantir que a estrutura dos dados permaneça consistente após a atualização
         address: {
           street: response.data.address?.street || "",
           city: response.data.address?.city || "",

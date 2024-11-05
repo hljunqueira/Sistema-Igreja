@@ -1,4 +1,3 @@
-// src/App.js
 import React from "react";
 import { CssBaseline } from "@mui/material";
 import Navigation from "./components/Navigation/Navigation";

@@ -13,76 +13,73 @@ import {
   Alert,
   Snackbar,
 } from "@mui/material";
-import MuiAlert from "@mui/material/Alert";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
+import MuiAlert from "@mui/material/Alert";
 import dayjs from "dayjs";
+import ptBR from "dayjs/locale/pt-br";
 
 // Importar plugins necessários do dayjs
 import "dayjs/locale/pt-br";
-import weekOfYear from "dayjs/plugin/weekOfYear";
 import customParseFormat from "dayjs/plugin/customParseFormat";
-import localizedFormat from "dayjs/plugin/localizedFormat";
-import isBetween from "dayjs/plugin/isBetween";
-import advancedFormat from "dayjs/plugin/advancedFormat";
 
 // Estender dayjs com os plugins
-dayjs.extend(weekOfYear);
 dayjs.extend(customParseFormat);
-dayjs.extend(localizedFormat);
-dayjs.extend(isBetween);
-dayjs.extend(advancedFormat);
 
 // Definir localização para português do Brasil
 dayjs.locale("pt-br");
 
-function Register() {
-  const [formData, setFormData] = useState({
-    name: "",
+function Registrar() {
+  const [dadosFormulario, setDadosFormulario] = useState({
+    nome: "",
     email: "",
-    password: "",
-    confirmPassword: "",
-    isBaptized: false,
-    baptismDate: null,
-    phone: "",
-    birthDate: null,
+    senha: "",
+    confirmarSenha: "",
+    ehBatizado: false,
+    dataBatismo: null,
+    telefone: "",
+    dataNascimento: null,
   });
-  const [error, setError] = useState("");
+  const [erro, setErro] = useState("");
   const [snackbar, setSnackbar] = useState({
-    open: false,
-    message: "",
-    severity: "",
+    aberto: false,
+    mensagem: "",
+    severidade: "",
   });
-  const { register, loading } = useAuth(); // Certifique-se de que register está sendo desestruturado aqui
-  const navigate = useNavigate();
+  const { registrar, carregando } = useAuth();
+  const navegar = useNavigate();
 
   const handleChange = (e) => {
     const { name, value, checked, type } = e.target;
-    setFormData((prev) => ({
+    setDadosFormulario((prev) => ({
       ...prev,
       [name]: type === "checkbox" ? checked : value,
     }));
   };
 
-  const handleDateChange = (field, value) => {
-    setFormData((prev) => ({
+  const handleDateChange = (campo, valor) => {
+    setDadosFormulario((prev) => ({
       ...prev,
-      [field]: value,
+      [campo]: valor,
     }));
   };
 
-  const validateForm = () => {
-    if (!formData.name || !formData.email || !formData.password) {
-      setError("Todos os campos obrigatórios devem ser preenchidos");
+  const validarFormulario = () => {
+    if (
+      !dadosFormulario.nome ||
+      !dadosFormulario.email ||
+      !dadosFormulario.senha
+    ) {
+      setErro("Todos os campos obrigatórios devem ser preenchidos");
       return false;
     }
-    if (formData.password !== formData.confirmPassword) {
-      setError("As senhas não coincidem");
+    if (dadosFormulario.senha !== dadosFormulario.confirmarSenha) {
+      setErro("As senhas não coincidem");
       return false;
     }
-    if (formData.password.length < 6) {
-      setError("A senha deve ter pelo menos 6 caracteres");
+    if (dadosFormulario.senha.length < 6) {
+      setErro("A senha deve ter pelo menos 6 caracteres");
       return false;
     }
     return true;
@@ -90,47 +87,47 @@ function Register() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!validateForm()) return;
+    if (!validarFormulario()) return;
 
     try {
-      const registerData = {
-        name: formData.name,
-        email: formData.email,
-        password: formData.password,
-        user_type: "visitante",
-        phone: formData.phone,
-        birth_date: formData.birthDate
-          ? formData.birthDate.toISOString()
+      const dadosRegistro = {
+        nome: dadosFormulario.nome,
+        email: dadosFormulario.email,
+        senha: dadosFormulario.senha,
+        tipo_usuario: "visitante",
+        telefone: dadosFormulario.telefone,
+        data_nascimento: dadosFormulario.dataNascimento
+          ? dayjs(dadosFormulario.dataNascimento).format("DD/MM/YYYY")
           : null,
-        is_baptized: formData.isBaptized,
-        baptism_date: formData.baptismDate
-          ? formData.baptismDate.toISOString()
+        eh_batizado: dadosFormulario.ehBatizado,
+        data_batismo: dadosFormulario.dataBatismo
+          ? dayjs(dadosFormulario.dataBatismo).format("DD/MM/YYYY")
           : null,
       };
 
-      const result = await register(registerData);
+      const resultado = await registrar(dadosRegistro);
 
-      if (result.success) {
+      if (resultado.sucesso) {
         setSnackbar({
-          open: true,
-          message: "Registro realizado com sucesso!",
-          severity: "success",
+          aberto: true,
+          mensagem: "Registro realizado com sucesso!",
+          severidade: "sucesso",
         });
 
         // Redirecionar após um breve delay
         setTimeout(() => {
-          navigate("/registration-success");
+          navegar("/sucesso-registro");
         }, 2000);
       } else {
-        setError(result.error || "Erro ao registrar usuário");
+        setErro(resultado.erro || "Erro ao registrar usuário");
       }
     } catch (err) {
-      setError(err.message);
+      setErro(err.message);
     }
   };
 
   const handleSnackbarClose = () => {
-    setSnackbar({ ...snackbar, open: false });
+    setSnackbar({ ...snackbar, aberto: false });
   };
 
   return (
@@ -140,9 +137,9 @@ function Register() {
           Registro
         </Typography>
 
-        {error && (
+        {erro && (
           <Alert severity="error" sx={{ mb: 2 }}>
-            {error}
+            {erro}
           </Alert>
         )}
 
@@ -152,8 +149,8 @@ function Register() {
             required
             fullWidth
             label="Nome Completo"
-            name="name"
-            value={formData.name}
+            name="nome"
+            value={dadosFormulario.nome}
             onChange={handleChange}
           />
 
@@ -164,7 +161,7 @@ function Register() {
             label="Email"
             name="email"
             type="email"
-            value={formData.email}
+            value={dadosFormulario.email}
             onChange={handleChange}
           />
 
@@ -173,9 +170,9 @@ function Register() {
             required
             fullWidth
             label="Senha"
-            name="password"
+            name="senha"
             type="password"
-            value={formData.password}
+            value={dadosFormulario.senha}
             onChange={handleChange}
           />
 
@@ -184,9 +181,9 @@ function Register() {
             required
             fullWidth
             label="Confirmar Senha"
-            name="confirmPassword"
+            name="confirmarSenha"
             type="password"
-            value={formData.confirmPassword}
+            value={dadosFormulario.confirmarSenha}
             onChange={handleChange}
           />
 
@@ -194,16 +191,17 @@ function Register() {
             margin="normal"
             fullWidth
             label="Telefone"
-            name="phone"
-            value={formData.phone}
+            name="telefone"
+            value={dadosFormulario.telefone}
             onChange={handleChange}
           />
 
-          <LocalizationProvider dateAdapter={AdapterDayjs}>
+          <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale={ptBR}>
             <DatePicker
               label="Data de Nascimento"
-              value={formData.birthDate}
-              onChange={(date) => handleDateChange("birthDate", date)}
+              value={dadosFormulario.dataNascimento}
+              onChange={(data) => handleDateChange("dataNascimento", data)}
+              format="DD/MM/YYYY"
               slotProps={{
                 textField: {
                   fullWidth: true,
@@ -211,25 +209,13 @@ function Register() {
                 },
               }}
             />
-          </LocalizationProvider>
 
-          <FormControlLabel
-            control={
-              <Checkbox
-                name="isBaptized"
-                checked={formData.isBaptized}
-                onChange={handleChange}
-              />
-            }
-            label="É batizado?"
-          />
-
-          {formData.isBaptized && (
-            <LocalizationProvider dateAdapter={AdapterDayjs}>
+            {dadosFormulario.ehBatizado && (
               <DatePicker
                 label="Data do Batismo"
-                value={formData.baptismDate}
-                onChange={(date) => handleDateChange("baptismDate", date)}
+                value={dadosFormulario.dataBatismo}
+                onChange={(data) => handleDateChange("dataBatismo", data)}
+                format="DD/MM/YYYY"
                 slotProps={{
                   textField: {
                     fullWidth: true,
@@ -237,17 +223,28 @@ function Register() {
                   },
                 }}
               />
-            </LocalizationProvider>
-          )}
+            )}
+          </LocalizationProvider>
+
+          <FormControlLabel
+            control={
+              <Checkbox
+                name="ehBatizado"
+                checked={dadosFormulario.ehBatizado}
+                onChange={handleChange}
+              />
+            }
+            label="É batizado?"
+          />
 
           <Button
             type="submit"
             fullWidth
             variant="contained"
             sx={{ mt: 3, mb: 2 }}
-            disabled={loading}
+            disabled={carregando}
           >
-            {loading ? "Registrando..." : "Registrar"}
+            {carregando ? "Registrando..." : "Registrar"}
           </Button>
 
           <Box sx={{ mt: 2, textAlign: "center" }}>
@@ -261,20 +258,20 @@ function Register() {
       </Paper>
 
       <Snackbar
-        open={snackbar.open}
+        open={snackbar.aberto}
         autoHideDuration={6000}
         onClose={handleSnackbarClose}
       >
         <MuiAlert
           onClose={handleSnackbarClose}
-          severity={snackbar.severity}
+          severity={snackbar.severidade}
           sx={{ width: "100%" }}
         >
-          {snackbar.message}
+          {snackbar.mensagem}
         </MuiAlert>
       </Snackbar>
     </Container>
   );
 }
 
-export default Register;
+export default Registrar;

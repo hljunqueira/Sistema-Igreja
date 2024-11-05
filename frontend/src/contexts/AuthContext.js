@@ -1,5 +1,5 @@
-// frontend/src/contexts/AuthContext.js
 import React, { createContext, useState, useContext, useEffect } from "react";
+import { useNavigate } from "react-router-dom"; // Importar useNavigate
 import api, { setAuthToken } from "../services/api";
 
 const AuthContext = createContext(null);
@@ -8,6 +8,7 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const navigate = useNavigate(); // Inicializar useNavigate
 
   // Carregar usuário do token armazenado
   useEffect(() => {
@@ -77,6 +78,7 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem("authToken");
     setAuthToken(null);
     setUser(null);
+    navigate("/login"); // Redirecionar após o logout
   };
 
   const updateUser = async (userData) => {
