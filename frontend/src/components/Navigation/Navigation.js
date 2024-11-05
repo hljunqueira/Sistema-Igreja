@@ -1,66 +1,56 @@
 // src/components/Navigation/Navigation.js
 import React from "react";
 import { AppBar, Toolbar, Typography, Button, IconButton } from "@mui/material";
+import { Brightness4, Brightness7 } from "@mui/icons-material";
 import { Link } from "react-router-dom";
-import MenuIcon from "@mui/icons-material/Menu";
-import { useAuth } from "../../contexts/AuthContext"; // Adicione o hook useAuth
+import { useAuth } from "../../contexts/AuthContext";
+import { useTheme } from "../../contexts/ThemeContext";
 
 function Navigation() {
-  const { user, logout } = useAuth(); // Use o hook para acessar o contexto de autenticação
-
-  const handleLogout = () => {
-    logout();
-    window.location.href = "/login";
-  };
+  const { user, logout } = useAuth();
+  const { darkMode, toggleDarkMode } = useTheme();
 
   return (
     <AppBar position="static">
       <Toolbar>
-        <IconButton
-          edge="start"
-          color="inherit"
-          aria-label="menu"
-          sx={{ mr: 2 }}
-        >
-          <MenuIcon />
-        </IconButton>
-
-        <Typography variant="h6" sx={{ flexGrow: 1 }}>
+        <Typography variant="h6" style={{ flexGrow: 1 }}>
           Casa de Oração
         </Typography>
 
-        {user ? (
-          // Botões para usuários autenticados
+        {/* Menu principal */}
+        <Button color="inherit" component={Link} to="/home">
+          Início
+        </Button>
+
+        {/* Menu do Dashboard */}
+        <Button color="inherit" component={Link} to="/dashboard">
+          Dashboard
+        </Button>
+
+        {/* Menu Administrativo - apenas para administradores */}
+        {user?.user_type === "administrador" && (
           <>
-            <Button color="inherit" component={Link} to="/dashboard">
-              Dashboard
+            <Button color="inherit" component={Link} to="/admin/users">
+              Usuários
             </Button>
-            <Button color="inherit" component={Link} to="/members">
-              Membros
-            </Button>
-            <Button color="inherit" component={Link} to="/profile">
-              Perfil
-            </Button>
-            {user.is_admin && (
-              <Button color="inherit" component={Link} to="/admin">
-                Admin
-              </Button>
-            )}
-            <Button color="inherit" onClick={handleLogout}>
-              Sair
-            </Button>
-          </>
-        ) : (
-          // Botões para usuários não autenticados
-          <>
-            <Button color="inherit" component={Link} to="/login">
-              Login
-            </Button>
-            <Button color="inherit" component={Link} to="/register">
-              Registro
+            <Button color="inherit" component={Link} to="/admin/settings">
+              Configurações
             </Button>
           </>
         )}
+
+        {/* Perfil e Logout */}
+        <Button color="inherit" component={Link} to="/profile">
+          Perfil
+        </Button>
+        <Button color="inherit" onClick={logout}>
+          Sair
+        </Button>
+
+        {/* Botão para alternar entre modo claro e escuro */}
+        <IconButton color="inherit" onClick={toggleDarkMode}>
+          {darkMode ? <Brightness7 /> : <Brightness4 />}
+        </IconButton>
       </Toolbar>
     </AppBar>
   );

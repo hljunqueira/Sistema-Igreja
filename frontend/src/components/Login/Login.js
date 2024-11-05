@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+// src/components/Login/Login.js
+import React, { useState, useEffect } from "react";
 import { useAuth } from "../../contexts/AuthContext";
 import { useNavigate, Link } from "react-router-dom";
 import {
@@ -7,207 +8,230 @@ import {
   Container,
   Typography,
   Box,
-  Snackbar,
-  Alert,
   CircularProgress,
+  Alert,
+  IconButton,
+  InputAdornment,
+  Paper,
+  styled,
 } from "@mui/material";
-import { validateEmail } from "../../utils/validation";
+import { Visibility, VisibilityOff } from "@mui/icons-material";
+
+// Styled components
+const LoginContainer = styled(Container)(({ theme }) => ({
+  minHeight: "100vh",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  background: `linear-gradient(45deg, ${theme.palette.background.default} 0%, ${theme.palette.background.paper} 100%)`,
+}));
+
+const LoginCard = styled(Paper)(({ theme }) => ({
+  padding: theme.spacing(4),
+  borderRadius: 16,
+  maxWidth: 400,
+  width: "100%",
+  backdropFilter: "blur(10px)",
+  backgroundColor: "rgba(30, 30, 30, 0.8)",
+  boxShadow: "0 8px 32px 0 rgba(0, 0, 0, 0.37)",
+}));
+
+const LoginButton = styled(Button)(({ theme }) => ({
+  marginTop: theme.spacing(3),
+  marginBottom: theme.spacing(2),
+  padding: "12px",
+  fontSize: "1.1rem",
+  background: `linear-gradient(45deg, ${theme.palette.primary.main} 30%, ${theme.palette.primary.light} 90%)`,
+  "&:hover": {
+    background: `linear-gradient(45deg, ${theme.palette.primary.dark} 30%, ${theme.palette.primary.main} 90%)`,
+  },
+}));
 
 function Login() {
   const [formData, setFormData] = useState({
     email: "",
     password: "",
+    showPassword: false,
   });
-  const [formErrors, setFormErrors] = useState({});
-  const [snackbar, setSnackbar] = useState({
-    open: false,
-    message: "",
-    severity: "info",
-  });
-
-  const { login, error, loading } = useAuth();
+  const [validationErrors, setValidationErrors] = useState({});
+  const { login, error, loading, user } = useAuth();
   const navigate = useNavigate();
+
+  // Redirecionar se já estiver logado
+  useEffect(() => {
+    if (user) {
+      navigate("/home");
+    }
+  }, [user, navigate]);
 
   const validateForm = () => {
     const errors = {};
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
     if (!formData.email) {
       errors.email = "Email é obrigatório";
-    } else if (!validateEmail(formData.email)) {
+    } else if (!emailRegex.test(formData.email)) {
       errors.email = "Email inválido";
     }
 
     if (!formData.password) {
       errors.password = "Senha é obrigatória";
     } else if (formData.password.length < 6) {
-      errors.password = "A senha deve ter no mínimo 6 caracteres";
+      errors.password = "Senha deve ter no mínimo 6 caracteres";
     }
 
-    return errors;
+    setValidationErrors(errors);
+    return Object.keys(errors).length === 0;
   };
 
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+  const handleChange = (prop) => (event) => {
+    setFormData({ ...formData, [prop]: event.target.value });
     // Limpa o erro do campo quando o usuário começa a digitar
-    if (formErrors[name]) {
-      setFormErrors((prev) => ({
-        ...prev,
-        [name]: "",
-      }));
+    if (validationErrors[prop]) {
+      setValidationErrors({ ...validationErrors, [prop]: null });
     }
+  };
+
+  const handleClickShowPassword = () => {
+    setFormData({ ...formData, showPassword: !formData.showPassword });
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const errors = validateForm();
 
-    if (Object.keys(errors).length === 0) {
-      try {
-        const success = await login(formData.email, formData.password);
-        if (success) {
-          setSnackbar({
-            open: true,
-            message: "Login realizado com sucesso!",
-            severity: "success",
-          });
-          navigate("/dashboard");
-        }
-      } catch (err) {
-        setSnackbar({
-          open: true,
-          message: err.message || "Erro ao realizar login",
-          severity: "error",
-        });
+    if (!validateForm()) {
+      return;
+    }
+
+    try {
+      const success = await login(formData.email, formData.password);
+      if (success) {
+        navigate("/home");
       }
-    } else {
-      setFormErrors(errors);
+    } catch (err) {
+      console.error("Erro no login:", err);
     }
   };
 
-  const handleSnackbarClose = () => {
-    setSnackbar((prev) => ({
-      ...prev,
-      open: false,
-    }));
-  };
-
   return (
-    <Container component="main" maxWidth="xs">
-      <Box
-        sx={{
-          marginTop: 8,
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          backgroundColor: "white",
-          padding: 3,
-          borderRadius: 2,
-          boxShadow: 3,
-        }}
-      >
-        <Typography component="h1" variant="h5" sx={{ mb: 3 }}>
-          Login
-        </Typography>
+    <LoginContainer>
+      <LoginCard elevation={6}>
+        <Box
+          sx={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: 3,
+          }}
+        >
+          <Typography
+            component="h1"
+            variant="h4"
+            sx={{
+              fontWeight: "bold",
+              background: "linear-gradient(45deg, #90caf9 30%, #f48fb1 90%)",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+            }}
+          >
+            Casa de Oração
+          </Typography>
 
-        <Box component="form" onSubmit={handleSubmit} sx={{ mt: 1 }}>
           {error && (
-            <Alert severity="error" sx={{ mb: 2 }}>
+            <Alert severity="error" sx={{ width: "100%" }}>
               {error}
             </Alert>
           )}
 
-          <TextField
-            margin="normal"
-            required
-            fullWidth
-            id="email"
-            label="Email"
-            name="email"
-            autoComplete="email"
-            autoFocus
-            value={formData.email}
-            onChange={handleInputChange}
-            error={!!formErrors.email}
-            helperText={formErrors.email}
-            disabled={loading}
-          />
+          <Box component="form" onSubmit={handleSubmit} sx={{ width: "100%" }}>
+            <TextField
+              margin="normal"
+              required
+              fullWidth
+              id="email"
+              label="Email"
+              name="email"
+              autoComplete="email"
+              autoFocus
+              value={formData.email}
+              onChange={handleChange("email")}
+              error={!!validationErrors.email}
+              helperText={validationErrors.email}
+              sx={{ mb: 2 }}
+            />
 
-          <TextField
-            margin="normal"
-            required
-            fullWidth
-            name="password"
-            label="Senha"
-            type="password"
-            id="password"
-            autoComplete="current-password"
-            value={formData.password}
-            onChange={handleInputChange}
-            error={!!formErrors.password}
-            helperText={formErrors.password}
-            disabled={loading}
-          />
+            <TextField
+              margin="normal"
+              required
+              fullWidth
+              name="password"
+              label="Senha"
+              type={formData.showPassword ? "text" : "password"}
+              id="password"
+              autoComplete="current-password"
+              value={formData.password}
+              onChange={handleChange("password")}
+              error={!!validationErrors.password}
+              helperText={validationErrors.password}
+              InputProps={{
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <IconButton onClick={handleClickShowPassword} edge="end">
+                      {formData.showPassword ? (
+                        <VisibilityOff />
+                      ) : (
+                        <Visibility />
+                      )}
+                    </IconButton>
+                  </InputAdornment>
+                ),
+              }}
+            />
 
-          <Button
-            type="submit"
-            fullWidth
-            variant="contained"
-            sx={{ mt: 3, mb: 2, height: 48 }}
-            disabled={loading}
-          >
-            {loading ? (
-              <CircularProgress size={24} color="inherit" />
-            ) : (
-              "Entrar"
-            )}
-          </Button>
+            <LoginButton
+              type="submit"
+              fullWidth
+              variant="contained"
+              disabled={loading}
+            >
+              {loading ? (
+                <CircularProgress size={24} color="inherit" />
+              ) : (
+                "Entrar"
+              )}
+            </LoginButton>
 
-          <Box sx={{ textAlign: "center" }}>
-            <Link
-              to="/register"
-              style={{
-                textDecoration: "none",
-                color: (theme) => theme.palette.primary.main,
+            <Box
+              sx={{
+                display: "flex",
+                justifyContent: "space-between",
+                mt: 2,
               }}
             >
-              <Typography variant="body2">
-                Não tem uma conta? Registre-se
-              </Typography>
-            </Link>
+              <Link
+                to="/forgot-password"
+                style={{
+                  textDecoration: "none",
+                  color: "#90caf9",
+                }}
+              >
+                <Typography variant="body2">Esqueceu a senha?</Typography>
+              </Link>
 
-            <Link
-              to="/forgot-password"
-              style={{
-                textDecoration: "none",
-                color: (theme) => theme.palette.primary.main,
-                marginTop: 8,
-                display: "inline-block",
-              }}
-            >
-              <Typography variant="body2">Esqueceu sua senha?</Typography>
-            </Link>
+              <Link
+                to="/register"
+                style={{
+                  textDecoration: "none",
+                  color: "#90caf9",
+                }}
+              >
+                <Typography variant="body2">Criar uma conta</Typography>
+              </Link>
+            </Box>
           </Box>
         </Box>
-      </Box>
-
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={6000}
-        onClose={handleSnackbarClose}
-        anchorOrigin={{ vertical: "top", horizontal: "right" }}
-      >
-        <Alert
-          onClose={handleSnackbarClose}
-          severity={snackbar.severity}
-          sx={{ width: "100%" }}
-        >
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
-    </Container>
+      </LoginCard>
+    </LoginContainer>
   );
 }
 

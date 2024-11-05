@@ -2,131 +2,69 @@
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
-const path = require("path");
-const fs = require("fs");
+const rateLimit = require("express-rate-limit");
 const authRoutes = require("./routes/authRoutes");
-const memberRoutes = require("./routes/memberRoutes");
-const dashboardRoutes = require("./routes/dashboardRoutes");
-const {
-  createEventsTable,
-  createMinistriesTable,
-} = require("./models/Dashboard");
-const { createUserTable, createAdminUser } = require("./models/User");
+const userRoutes = require("./routes/userRoutes");
+const adminRoutes = require("./routes/adminRoutes");
+const pool = require("./config/db");
+const { createUserTable, addMissingColumns } = require("./models/User");
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// Configuração de logs detalhados
-const logRequests = (req, res, next) => {
-  const timestamp = new Date().toISOString();
-  console.log(`[${timestamp}] ${req.method} ${req.url}`);
-  console.log("Headers:", req.headers);
-  console.log("Body:", req.body);
-  next();
-};
+// Configurar rate limiter
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutos
+  max: 100, // limite de 100 requisições por IP
+});
 
 // Middlewares
-app.use(logRequests);
 app.use(
   cors({
-    origin: "http://localhost:3000", // Permite requisições do frontend
+    origin: "http://localhost:3000",
     credentials: true,
   })
 );
 app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(limiter);
 
-// Verificar diretórios
-const uploadsDir = path.join(__dirname, "uploads");
-const profilesDir = path.join(uploadsDir, "profiles");
-
-[uploadsDir, profilesDir].forEach((dir) => {
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-    console.log(`Diretório criado: ${dir}`);
-  } else {
-    console.log(`Diretório existente: ${dir}`);
-  }
+// Middleware para logging de requisições
+app.use((req, res, next) => {
+  console.log(`${req.method} ${req.path}`);
+  next();
 });
 
-// Configurar pasta de uploads como estática
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+// Rotas
+app.use("/api", authRoutes);
+app.use("/api/user", userRoutes);
+app.use("/api/admin", adminRoutes);
 
-// Rota de teste básica
-app.get("/test", (req, res) => {
-  res.json({ message: "Servidor está funcionando!" });
-});
-
-// Rotas da API
-app.use("/api/auth", authRoutes);
-app.use("/api/members", memberRoutes);
-app.use("/api/dashboard", dashboardRoutes);
-
-// Rota raiz
-app.get("/", (req, res) => {
-  res.json({
-    message: "API está funcionando",
-    timestamp: new Date().toISOString(),
-  });
-});
-
-// Inicialização das tabelas
-const initTables = async () => {
-  try {
-    console.log("Iniciando criação das tabelas...");
-    await createUserTable();
-    await createAdminUser();
-    await createEventsTable();
-    await createMinistriesTable();
-    console.log("Todas as tabelas foram inicializadas com sucesso!");
-  } catch (error) {
-    console.error("Erro ao inicializar tabelas:", error);
-  }
-};
-
-// Tratamento de erros global
+// Tratamento de erros
 app.use((err, req, res, next) => {
-  console.error("Erro na aplicação:", err);
+  console.error(err.stack);
   res.status(500).json({
     message: "Erro interno do servidor",
     error: process.env.NODE_ENV === "development" ? err.message : undefined,
   });
 });
 
-// Iniciar servidor
+// Inicialização do servidor
 const startServer = async () => {
   try {
-    // Inicializa as tabelas
-    await initTables();
+    await pool.query("SELECT NOW()");
+    console.log("Conexão com o banco de dados estabelecida!");
 
-    // Inicia o servidor
+    await createUserTable();
+    await addMissingColumns();
+    console.log("Estrutura da tabela de usuários verificada/atualizada!");
+
     app.listen(PORT, () => {
-      console.log(`=================================`);
-      console.log(`Servidor iniciado com sucesso!`);
-      console.log(`Porta: ${PORT}`);
-      console.log(`Ambiente: ${process.env.NODE_ENV || "development"}`);
-      console.log(`Uploads: ${uploadsDir}`);
-      console.log(`Profiles: ${profilesDir}`);
-      console.log(`=================================`);
+      console.log(`Servidor rodando na porta ${PORT}`);
     });
   } catch (error) {
-    console.error("Erro ao iniciar servidor:", error);
+    console.error("Erro durante a inicialização:", error);
     process.exit(1);
   }
 };
 
-// Tratamento de erros não capturados
-process.on("uncaughtException", (error) => {
-  console.error("Erro não capturado:", error);
-  process.exit(1);
-});
-
-process.on("unhandledRejection", (error) => {
-  console.error("Promise rejection não tratada:", error);
-  process.exit(1);
-});
-
-// Inicia o servidor
 startServer();
-
-module.exports = app; // Para testes

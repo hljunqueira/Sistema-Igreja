@@ -1,144 +1,121 @@
-// frontend/src/contexts/AuthContext.js
+// src/contexts/AuthContext.js
 import React, { createContext, useState, useContext, useEffect } from "react";
-import { api } from "../services/api";
+import api, { setAuthToken } from "../services/api"; // Certifique-se de que este caminho está correto
 
-const AuthContext = createContext({});
+const AuthContext = createContext(null);
 
-export function AuthProvider({ children }) {
+export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [error, setError] = useState(null);
 
+  // Carregar usuário do token armazenado
   useEffect(() => {
-    const loadStorageData = async () => {
-      const storedToken = localStorage.getItem("@App:token");
-      const storedUser = localStorage.getItem("@App:user");
-
-      if (storedToken && storedUser) {
-        api.defaults.headers.Authorization = `Bearer ${storedToken}`;
-        setUser(JSON.parse(storedUser));
+    const loadUser = async () => {
+      const token = localStorage.getItem("authToken");
+      if (token) {
+        try {
+          setAuthToken(token);
+          const response = await api.get("/user"); // Ajuste esta rota conforme sua API
+          setUser(response.data);
+        } catch (err) {
+          console.error("Erro ao carregar usuário:", err);
+          localStorage.removeItem("authToken");
+          setAuthToken(null);
+        }
       }
-
       setLoading(false);
     };
 
-    loadStorageData();
+    loadUser();
   }, []);
 
   const login = async (email, password) => {
     try {
+      setError(null);
       setLoading(true);
-      setError("");
 
-      const response = await api.post("/auth/login", { email, password });
-
+      const response = await api.post("/login", { email, password }); // Ajuste esta rota conforme sua API
       const { token, user } = response.data;
 
-      localStorage.setItem("@App:token", token);
-      localStorage.setItem("@App:user", JSON.stringify(user));
-
-      api.defaults.headers.Authorization = `Bearer ${token}`;
-
+      localStorage.setItem("authToken", token);
+      setAuthToken(token);
       setUser(user);
+
+      console.log("Usuário após login:", user); // Para debug
       return true;
     } catch (err) {
-      setError(err.response?.data?.message || "Erro ao realizar login");
+      console.error("Erro no login:", err);
+      setError(err.response?.data?.message || "Erro ao fazer login");
       return false;
     } finally {
       setLoading(false);
     }
   };
 
-  const register = async (name, email, password) => {
+  const register = async (userData) => {
     try {
+      setError(null);
       setLoading(true);
-      setError("");
 
-      const response = await api.post("/auth/register", {
-        name,
-        email,
-        password,
-      });
+      const response = await api.post("/register", userData); // Ajuste esta rota conforme sua API
 
-      const { token, user } = response.data;
+      // Se o registro for bem-sucedido e retornar um token, fazer login automático
+      if (response.data.token) {
+        localStorage.setItem("authToken", response.data.token); // Armazena o token
+        setAuthToken(response.data.token); // Define o token para futuras requisições
+        setUser(response.data.user); // Define o usuário no estado
+      }
 
-      localStorage.setItem("@App:token", token);
-      localStorage.setItem("@App:user", JSON.stringify(user));
-
-      api.defaults.headers.Authorization = `Bearer ${token}`;
-
-      setUser(user);
-      return true;
+      return { success: true, data: response.data }; // Retorna sucesso e dados
     } catch (err) {
-      setError(err.response?.data?.message || "Erro ao realizar registro");
-      return false;
+      console.error("Erro no registro:", err);
+      setError(err.response?.data?.message || "Erro ao registrar usuário");
+      return { success: false, error: err.response?.data?.message }; // Retorna erro
     } finally {
       setLoading(false);
     }
   };
 
   const logout = () => {
-    localStorage.removeItem("@App:token");
-    localStorage.removeItem("@App:user");
-    api.defaults.headers.Authorization = undefined;
+    localStorage.removeItem("authToken");
+    setAuthToken(null);
     setUser(null);
   };
 
-  const updateProfile = async (userData) => {
+  const updateUser = async (userData) => {
     try {
-      setLoading(true);
-      setError("");
-
-      const response = await api.put("/auth/profile", userData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
-      });
-
-      const updatedUser = response.data.user;
-
-      localStorage.setItem("@App:user", JSON.stringify(updatedUser));
-      setUser(updatedUser);
-
-      console.log("Perfil atualizado:", updatedUser);
-
-      return updatedUser;
+      setError(null);
+      const response = await api.put("/user", userData); // Ajuste esta rota conforme sua API
+      setUser(response.data); // Atualiza o usuário com os dados retornados
+      return true;
     } catch (err) {
-      console.error("Erro ao atualizar perfil:", err);
-      setError(err.response?.data?.message || "Erro ao atualizar perfil");
-      throw err;
-    } finally {
-      setLoading(false);
+      setError(err.response?.data?.message || "Erro ao atualizar usuário");
+      return false;
     }
-  };
-
-  const clearError = () => {
-    setError("");
   };
 
   return (
     <AuthContext.Provider
       value={{
-        signed: !!user,
         user,
         loading,
         error,
         login,
-        register,
         logout,
-        updateProfile,
-        clearError,
+        register, // Certifique-se de incluir register aqui
+        updateUser,
       }}
     >
       {children}
     </AuthContext.Provider>
   );
-}
+};
 
-export function useAuth() {
+export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
     throw new Error("useAuth deve ser usado dentro de um AuthProvider");
   }
   return context;
-}
+};

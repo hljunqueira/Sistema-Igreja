@@ -1,76 +1,150 @@
+// src/services/api.js
 import axios from "axios";
 
-export const api = axios.create({
-  baseURL: "http://localhost:3001/api",
+const API_URL = "http://localhost:3001/api";
+
+// Criar instância do axios com configurações padrão
+const api = axios.create({
+  baseURL: API_URL,
   headers: {
     "Content-Type": "application/json",
   },
 });
 
-// Função para definir o token de autenticação
+// Função auxiliar para configurar o token de autenticação
 export const setAuthToken = (token) => {
   if (token) {
-    api.defaults.headers.Authorization = `Bearer ${token}`;
+    api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+    localStorage.setItem("authToken", token);
   } else {
-    delete api.defaults.headers.Authorization;
+    delete api.defaults.headers.common["Authorization"];
+    localStorage.removeItem("authToken");
   }
 };
 
-// Interceptor para adicionar token
+// Interceptor para requisições
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem("@App:token");
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
+    console.log("API Request:", {
+      method: config.method,
+      url: config.url,
+      data: config.data,
+      headers: config.headers,
+    });
     return config;
   },
   (error) => {
+    console.error("Request Error:", error);
     return Promise.reject(error);
   }
 );
 
-// Interceptor para tratamento de erros
+// Interceptor para respostas
 api.interceptors.response.use(
-  (response) => response,
-  async (error) => {
-    const originalRequest = error.config;
+  (response) => {
+    console.log("API Response:", {
+      status: response.status,
+      data: response.data,
+    });
+    return response;
+  },
+  (error) => {
+    console.error("Response Error:", {
+      message: error.message,
+      response: error.response?.data,
+      status: error.response?.status,
+    });
+    return Promise.reject(error);
+  }
+);
 
-    // Se o erro for 401 (não autorizado) e não for uma tentativa de refresh
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      originalRequest._retry = true;
+// Função de login
+export const loginUser = async (email, password) => {
+  try {
+    console.log("Tentando login com:", { email });
+    const response = await api.post("/login", { email, password });
 
-      try {
-        // Tentar renovar o token
-        const response = await api.post("/auth/refresh-token");
-        const { token } = response.data;
-
-        localStorage.setItem("@App:token", token);
-        setAuthToken(token);
-
-        // Repetir a requisição original com o novo token
-        return api(originalRequest);
-      } catch (refreshError) {
-        // Se não conseguir renovar o token, fazer logout
-        localStorage.removeItem("@App:token");
-        localStorage.removeItem("@App:user");
-        window.location.href = "/login";
-      }
+    // Se o login for bem-sucedido, armazena o token
+    if (response.data.token) {
+      setAuthToken(response.data.token);
     }
 
-    return Promise.reject(error);
+    return response.data;
+  } catch (error) {
+    console.error("Erro no login:", error);
+    throw new Error(error.response?.data?.message || "Erro ao fazer login");
   }
-);
+};
 
-export const dashboardService = {
-  getDashboardData: async () => {
-    try {
-      const response = await api.get("/dashboard");
-      return response.data;
-    } catch (error) {
-      throw new Error(
-        error.response?.data?.message || "Erro ao buscar dados do dashboard"
+// Função de registro
+export const registerUser = async (name, email, password) => {
+  try {
+    console.log("Tentando registrar usuário:", { name, email });
+    const response = await api.post("/register", { name, email, password });
+    return response.data;
+  } catch (error) {
+    console.error("Erro no registro:", error);
+    throw new Error(
+      error.response?.data?.message || "Erro ao registrar usuário"
+    );
+  }
+};
+
+// Função para obter dados do usuário
+export const getUserData = async () => {
+  try {
+    const response = await api.get("/user");
+    return response.data;
+  } catch (error) {
+    console.error("Erro ao obter dados do usuário:", error);
+    throw new Error(
+      error.response?.data?.message || "Erro ao obter dados do usuário"
+    );
+  }
+};
+
+// Função para atualizar dados do usuário
+export const updateUserData = async (userData) => {
+  try {
+    const response = await api.put("/user", userData);
+    return response.data;
+  } catch (error) {
+    console.error("Erro ao atualizar dados:", error);
+    throw new Error(error.response?.data?.message || "Erro ao atualizar dados");
+  }
+};
+
+// Função para verificar se o token está válido
+export const checkAuthToken = async () => {
+  try {
+    const response = await api.get("/verify-token");
+    return response.status === 200;
+  } catch (error) {
+    console.error("Erro ao verificar token:", error);
+    return false;
+  }
+};
+
+// Função para fazer logout
+export const logoutUser = async () => {
+  try {
+    const token = localStorage.getItem("authToken");
+    if (token) {
+      await api.post(
+        "/logout",
+        {},
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
       );
     }
-  },
+    setAuthToken(null);
+    return true;
+  } catch (error) {
+    console.error("Erro ao fazer logout:", error);
+    setAuthToken(null);
+    throw new Error(error.response?.data?.message || "Erro ao fazer logout");
+  }
 };
+
+export default api;

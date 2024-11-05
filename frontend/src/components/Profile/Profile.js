@@ -1,271 +1,368 @@
+// src/components/Profile/Profile.js
 import React, { useState, useEffect, useCallback } from "react";
-import { useAuth } from "../../contexts/AuthContext";
 import {
   Container,
   Typography,
   TextField,
   Button,
   Grid,
-  Box,
-  Alert,
-  Snackbar,
-  CircularProgress,
   Paper,
+  Box,
   Avatar,
+  Snackbar,
+  Alert,
+  FormControlLabel,
+  Switch,
+  CircularProgress,
 } from "@mui/material";
-import CloudUploadIcon from "@mui/icons-material/CloudUpload";
+import { useAuth } from "../../contexts/AuthContext";
+import api from "../../services/api";
+import { Link } from "react-router-dom";
 
 function Profile() {
-  const { user, updateProfile, loading } = useAuth();
+  const { user } = useAuth();
   const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    currentPassword: "",
-    newPassword: "",
-    confirmPassword: "",
+    name: user?.name || "",
+    email: user?.email || "",
+    phone: "",
+    birth_date: "",
+    address: {
+      street: "",
+      city: "",
+      state: "",
+      zipCode: "",
+    },
+    notifications_preferences: {
+      email: true,
+      push: true,
+    },
+    profile_image_url: "",
   });
-  const [profileImage, setProfileImage] = useState(null);
-  const [previewImage, setPreviewImage] = useState(null);
+
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
   const [snackbar, setSnackbar] = useState({
     open: false,
     message: "",
-    severity: "info",
+    severity: "success",
   });
 
-  useEffect(() => {
-    if (user) {
-      console.log("Dados do usuário carregados:", user);
+  const showSnackbar = useCallback((message, severity = "success") => {
+    setSnackbar({ open: true, message, severity });
+  }, []);
+
+  // Função para buscar os dados do usuário
+  const fetchUserData = useCallback(async () => {
+    try {
+      const response = await api.get("/user/profile");
       setFormData((prev) => ({
         ...prev,
-        name: user.name || "",
-        email: user.email || "",
+        ...response.data,
+        // Garantir que address sempre tenha uma estrutura válida
+        address: {
+          street: response.data.address?.street || "",
+          city: response.data.address?.city || "",
+          state: response.data.address?.state || "",
+          zipCode: response.data.address?.zipCode || "",
+        },
+        // Garantir que notifications_preferences sempre tenha uma estrutura válida
+        notifications_preferences: {
+          email: response.data.notifications_preferences?.email ?? true,
+          push: response.data.notifications_preferences?.push ?? true,
+        },
+        // Garantir que outros campos tenham valores padrão se forem nulos
+        name: response.data.name || "",
+        email: response.data.email || "",
+        phone: response.data.phone || "",
+        birth_date: response.data.birth_date || "",
+        profile_image_url: response.data.profile_image_url || "",
       }));
-      setPreviewImage(user.profileImageUrl);
+    } catch (err) {
+      setError("Erro ao carregar dados do usuário");
+      showSnackbar("Erro ao carregar dados do usuário", "error");
+    } finally {
+      setLoading(false);
     }
-  }, [user]);
+  }, [showSnackbar]);
 
-  const validateForm = useCallback(() => {
-    const errors = {};
+  useEffect(() => {
+    fetchUserData();
+  }, [fetchUserData]);
 
-    if (!formData.name.trim()) errors.name = "Nome é obrigatório";
-    if (!formData.email.trim()) errors.email = "Email é obrigatório";
-    else if (!/\S+@\S+\.\S+/.test(formData.email))
-      errors.email = "Email inválido";
+  const handleInputChange = (event) => {
+    const { name, value } = event.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
 
-    if (formData.newPassword) {
-      if (formData.newPassword.length < 6) {
-        errors.newPassword = "A nova senha deve ter no mínimo 6 caracteres";
-      }
-      if (formData.newPassword !== formData.confirmPassword) {
-        errors.confirmPassword = "As senhas não conferem";
-      }
-      if (!formData.currentPassword) {
-        errors.currentPassword =
-          "Senha atual é obrigatória para alterar a senha";
-      }
-    }
+  const handleAddressChange = (event) => {
+    const { name, value } = event.target;
+    setFormData((prev) => ({
+      ...prev,
+      address: {
+        ...prev.address,
+        [name]: value,
+      },
+    }));
+  };
 
-    return errors;
-  }, [formData]);
+  const handleNotificationPreferenceChange = (type) => {
+    setFormData((prev) => ({
+      ...prev,
+      notifications_preferences: {
+        ...prev.notifications_preferences,
+        [type]: !prev.notifications_preferences[type],
+      },
+    }));
+  };
 
-  const handleImageChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        setSnackbar({
-          open: true,
-          message: "Arquivo muito grande. O tamanho máximo é 5MB.",
-          severity: "error",
-        });
-        return;
-      }
-      console.log("Nova imagem selecionada:", file);
-      setProfileImage(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPreviewImage(reader.result);
-      };
-      reader.readAsDataURL(file);
+  const handleImageUpload = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append("profile_image", file);
+
+    try {
+      setSaving(true);
+      const response = await api.post("/user/profile/image", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      setFormData((prev) => ({
+        ...prev,
+        profile_image_url: response.data.imageUrl,
+      }));
+      showSnackbar("Foto de perfil atualizada com sucesso!", "success");
+    } catch (error) {
+      showSnackbar("Erro ao atualizar foto de perfil", "error");
+    } finally {
+      setSaving(false);
     }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const errors = validateForm();
-
-    if (Object.keys(errors).length === 0) {
-      try {
-        const formDataToSend = new FormData();
-        formDataToSend.append("name", formData.name);
-        formDataToSend.append("email", formData.email);
-        if (formData.currentPassword)
-          formDataToSend.append("currentPassword", formData.currentPassword);
-        if (formData.newPassword)
-          formDataToSend.append("newPassword", formData.newPassword);
-        if (profileImage) formDataToSend.append("profileImage", profileImage);
-
-        const updatedUser = await updateProfile(formDataToSend);
-
-        if (updatedUser) {
-          setSnackbar({
-            open: true,
-            message: "Perfil atualizado com sucesso",
-            severity: "success",
-          });
-          console.log("Perfil atualizado:", updatedUser);
-          setFormData((prev) => ({ ...prev, ...updatedUser }));
-          setPreviewImage(updatedUser.profileImageUrl);
-        }
-      } catch (error) {
-        setSnackbar({
-          open: true,
-          message: "Erro ao atualizar perfil",
-          severity: "error",
-        });
-        console.error("Erro ao atualizar perfil:", error);
-      }
-    } else {
-      setSnackbar({
-        open: true,
-        message: "Verifique os erros no formulário",
-        severity: "error",
-      });
-      console.error("Erros no formulário:", errors);
+    try {
+      setSaving(true);
+      const response = await api.put("/user/profile", formData);
+      setFormData((prev) => ({
+        ...prev,
+        ...response.data,
+        // Garantir que a estrutura dos dados permaneça consistente após a atualização
+        address: {
+          street: response.data.address?.street || "",
+          city: response.data.address?.city || "",
+          state: response.data.address?.state || "",
+          zipCode: response.data.address?.zipCode || "",
+        },
+        notifications_preferences: {
+          email: response.data.notifications_preferences?.email ?? true,
+          push: response.data.notifications_preferences?.push ?? true,
+        },
+      }));
+      showSnackbar("Perfil atualizado com sucesso!", "success");
+    } catch (error) {
+      showSnackbar("Erro ao atualizar perfil", "error");
+    } finally {
+      setSaving(false);
     }
   };
 
-  return (
-    <Container maxWidth="md" sx={{ mt: 4, mb: 4 }}>
-      <Typography variant="h4" gutterBottom>
-        Perfil
+  if (loading) {
+    return (
+      <Box
+        display="flex"
+        justifyContent="center"
+        alignItems="center"
+        minHeight="80vh"
+      >
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (error) {
+    return (
+      <Typography variant="h5" color="error">
+        {error}
       </Typography>
-      <Paper elevation={2} sx={{ p: 2 }}>
-        <Grid container spacing={2}>
-          <Grid item xs={12} sm={6}>
-            <TextField
-              fullWidth
-              label="Nome"
-              value={formData.name}
-              onChange={(e) =>
-                setFormData((prev) => ({ ...prev, name: e.target.value }))
-              }
-              error={!!validateForm().name}
-              helperText={validateForm().name}
-            />
-          </Grid>
-          <Grid item xs={12} sm={6}>
-            <TextField
-              fullWidth
-              label="Email"
-              value={formData.email}
-              onChange={(e) =>
-                setFormData((prev) => ({ ...prev, email: e.target.value }))
-              }
-              error={!!validateForm().email}
-              helperText={validateForm().email}
-            />
-          </Grid>
-          <Grid item xs={12} sm={6}>
-            <TextField
-              fullWidth
-              label="Senha atual"
-              type="password"
-              value={formData.currentPassword}
-              onChange={(e) =>
-                setFormData((prev) => ({
-                  ...prev,
-                  currentPassword: e.target.value,
-                }))
-              }
-              error={!!validateForm().currentPassword}
-              helperText={validateForm().currentPassword}
-            />
-          </Grid>
-          <Grid item xs={12} sm={6}>
-            <TextField
-              fullWidth
-              label="Nova senha"
-              type="password"
-              value={formData.newPassword}
-              onChange={(e) =>
-                setFormData((prev) => ({
-                  ...prev,
-                  newPassword: e.target.value,
-                }))
-              }
-              error={!!validateForm().newPassword}
-              helperText={validateForm().newPassword}
-            />
-          </Grid>
-          <Grid item xs={12} sm={6}>
-            <TextField
-              fullWidth
-              label="Confirmar senha"
-              type="password"
-              value={formData.confirmPassword}
-              onChange={(e) =>
-                setFormData((prev) => ({
-                  ...prev,
-                  confirmPassword: e.target.value,
-                }))
-              }
-              error={!!validateForm().confirmPassword}
-              helperText={validateForm().confirmPassword}
-            />
-          </Grid>
-          <Grid item xs={12}>
-            <Box
-              sx={{
-                display: "flex",
-                justifyContent: "center",
-                alignItems: "center",
-                flexDirection: "column",
-              }}
-            >
+    );
+  }
+
+  return (
+    <Container maxWidth="md">
+      <Box sx={{ mt: 4, mb: 4 }}>
+        <Typography variant="h4" gutterBottom>
+          Perfil do Usuário
+        </Typography>
+
+        <Grid container spacing={3}>
+          <Grid item xs={12} md={4}>
+            <Paper elevation={3} sx={{ p: 3, textAlign: "center" }}>
               <Avatar
-                src={previewImage}
-                sx={{ width: 100, height: 100, mb: 2 }}
-                alt={formData.name}
+                src={formData.profile_image_url}
+                sx={{ width: 100, height: 100, margin: "auto", mb: 2 }}
               />
-              <input
-                type="file"
-                id="profileImage"
-                name="profileImage"
-                onChange={handleImageChange}
-                accept="image/*"
-                style={{ display: "none" }}
-              />
-              <label htmlFor="profileImage">
-                <Button
-                  variant="contained"
-                  component="span"
-                  startIcon={<CloudUploadIcon />}
-                >
-                  Escolher Imagem
-                </Button>
-              </label>
-            </Box>
+              <Button variant="outlined" component="label">
+                Alterar Foto
+                <input type="file" hidden onChange={handleImageUpload} />
+              </Button>
+              <Typography variant="subtitle1" sx={{ mt: 2 }}>
+                {formData.name}
+              </Typography>
+              <Typography variant="body2" color="textSecondary">
+                {user?.user_type || "membro"}
+              </Typography>
+              <Button
+                variant="text"
+                component={Link}
+                to="/change-password"
+                sx={{ mt: 2 }}
+              >
+                Alterar Senha
+              </Button>
+            </Paper>
           </Grid>
-          <Grid item xs={12}>
-            <Button
-              variant="contained"
-              color="primary"
-              fullWidth
-              onClick={handleSubmit}
-              disabled={loading}
-            >
-              {loading ? <CircularProgress size={24} /> : "Atualizar perfil"}
-            </Button>
+
+          <Grid item xs={12} md={8}>
+            <Paper elevation={3} sx={{ p: 3 }}>
+              <Typography variant="h6" gutterBottom>
+                Informações Pessoais
+              </Typography>
+              <form onSubmit={handleSubmit}>
+                <Grid container spacing={2}>
+                  <Grid item xs={12}>
+                    <TextField
+                      fullWidth
+                      label="Nome"
+                      value={formData.name}
+                      onChange={handleInputChange}
+                      name="name"
+                    />
+                  </Grid>
+                  <Grid item xs={12}>
+                    <TextField
+                      fullWidth
+                      label="Email"
+                      value={formData.email}
+                      onChange={handleInputChange}
+                      name="email"
+                      type="email"
+                    />
+                  </Grid>
+                  <Grid item xs={12}>
+                    <TextField
+                      fullWidth
+                      label="Telefone"
+                      value={formData.phone}
+                      onChange={handleInputChange}
+                      name="phone"
+                    />
+                  </Grid>
+                  <Grid item xs={12}>
+                    <TextField
+                      fullWidth
+                      label="Data de Nascimento"
+                      value={formData.birth_date}
+                      onChange={handleInputChange}
+                      name="birth_date"
+                      type="date"
+                      InputLabelProps={{
+                        shrink: true,
+                      }}
+                    />
+                  </Grid>
+                  <Grid item xs={12}>
+                    <Typography variant="h6" gutterBottom>
+                      Endereço
+                    </Typography>
+                    <TextField
+                      fullWidth
+                      label="Rua"
+                      value={formData.address.street}
+                      onChange={handleAddressChange}
+                      name="street"
+                    />
+                    <TextField
+                      fullWidth
+                      label="Cidade"
+                      value={formData.address.city}
+                      onChange={handleAddressChange}
+                      name="city"
+                    />
+                    <TextField
+                      fullWidth
+                      label="Estado"
+                      value={formData.address.state}
+                      onChange={handleAddressChange}
+                      name="state"
+                    />
+                    <TextField
+                      fullWidth
+                      label="CEP"
+                      value={formData.address.zipCode}
+                      onChange={handleAddressChange}
+                      name="zipCode"
+                    />
+                  </Grid>
+                  <Grid item xs={12}>
+                    <Typography variant="h6" gutterBottom>
+                      Preferências de Notificação
+                    </Typography>
+                    <FormControlLabel
+                      control={
+                        <Switch
+                          checked={formData.notifications_preferences.email}
+                          onChange={() =>
+                            handleNotificationPreferenceChange("email")
+                          }
+                        />
+                      }
+                      label="Email"
+                    />
+                    <FormControlLabel
+                      control={
+                        <Switch
+                          checked={formData.notifications_preferences.push}
+                          onChange={() =>
+                            handleNotificationPreferenceChange("push")
+                          }
+                        />
+                      }
+                      label="Notificações Push"
+                    />
+                  </Grid>
+                  <Grid item xs={12}>
+                    <Button
+                      variant="contained"
+                      color="primary"
+                      type="submit"
+                      disabled={saving}
+                    >
+                      {saving ? "Salvando..." : "Salvar"}
+                    </Button>
+                  </Grid>
+                </Grid>
+              </form>
+            </Paper>
           </Grid>
         </Grid>
-      </Paper>
-
+      </Box>
       <Snackbar
         open={snackbar.open}
         autoHideDuration={6000}
-        onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
       >
-        <Alert severity={snackbar.severity}>{snackbar.message}</Alert>
+        <Alert
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
+          severity={snackbar.severity}
+          sx={{ width: "100%" }}
+        >
+          {snackbar.message}
+        </Alert>
       </Snackbar>
     </Container>
   );

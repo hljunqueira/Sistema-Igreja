@@ -3,42 +3,23 @@ const jwt = require("jsonwebtoken");
 
 const authMiddleware = (req, res, next) => {
   try {
-    const authHeader = req.header("Authorization");
-    console.log("Auth Header:", authHeader); // Debug
+    // 1. Obter o token do cabeçalho da requisição
+    const token = req.headers.authorization?.split(" ")[1]; // Usa a estrutura correta para obter o token
 
-    if (!authHeader) {
-      return res.status(401).json({
-        message: "Acesso negado. Header de autorização não fornecido.",
-      });
-    }
-
-    const token = authHeader.replace("Bearer ", "");
-    console.log("Token extraído:", token); // Debug
-
+    // 2. Verificar se o token está presente
     if (!token) {
-      return res.status(401).json({
-        message: "Acesso negado. Token não fornecido.",
-      });
+      return res.status(401).json({ message: "Token não fornecido." });
     }
 
-    try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      console.log("Token decodificado:", decoded); // Debug
-      req.user = decoded;
-      next();
-    } catch (error) {
-      console.error("Erro na verificação do token:", error); // Debug
-      return res.status(401).json({
-        message: "Token inválido.",
-        error:
-          process.env.NODE_ENV === "development" ? error.message : undefined,
-      });
-    }
+    // 3. Verificar e decodificar o token
+    const decodedToken = jwt.verify(token, process.env.JWT_SECRET); // Use a chave secreta do ambiente
+    req.user = { userId: decodedToken.userId }; // Armazena o ID do usuário decodificado na requisição
+
+    console.log("Token decodificado:", decodedToken); // Log para debug
+    next(); // Chama o próximo middleware ou rota
   } catch (error) {
-    console.error("Erro no middleware de autenticação:", error);
-    return res.status(500).json({
-      message: "Erro interno no servidor",
-    });
+    console.error("Erro na autenticação:", error);
+    return res.status(401).json({ message: "Token inválido ou expirado." });
   }
 };
 
