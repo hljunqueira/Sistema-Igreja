@@ -1,5 +1,5 @@
 // backend/models/User.js
-const pool = require("../config/db");
+const { pool } = require("../config/db");
 
 const createUserTable = async () => {
   try {
@@ -35,42 +35,22 @@ const createUserTable = async () => {
 const addMissingColumns = async () => {
   try {
     const columnsToAdd = [
-      {
-        name: "phone",
-        type: "VARCHAR(20)",
-      },
-      {
-        name: "birth_date",
-        type: "DATE",
-      },
-      {
-        name: "address",
-        type: "JSONB",
-        default: "'{}'",
-      },
-      {
-        name: "theme_preference",
-        type: "VARCHAR(10)",
-        default: "'light'",
-      },
+      { name: "phone", type: "VARCHAR(20)" },
+      { name: "birth_date", type: "DATE" },
+      { name: "address", type: "JSONB", default: "'{}'" },
+      { name: "theme_preference", type: "VARCHAR(10)", default: "'light'" },
       {
         name: "notifications_preferences",
         type: "JSONB",
         default: '\'{"email": true, "push": true}\'',
       },
+      { name: "is_baptized", type: "BOOLEAN", default: "FALSE" },
+      { name: "baptism_date", type: "DATE" },
+      { name: "status", type: "VARCHAR(20)", default: "'pending'" },
       {
-        name: "is_baptized",
-        type: "BOOLEAN",
-        default: "FALSE",
-      },
-      {
-        name: "baptism_date",
-        type: "DATE",
-      },
-      {
-        name: "status",
-        type: "VARCHAR(20)",
-        default: "'pending'",
+        name: "created_at",
+        type: "TIMESTAMP WITH TIME ZONE",
+        default: "CURRENT_TIMESTAMP",
       },
     ];
 
@@ -107,20 +87,9 @@ const getUserByEmail = async (email) => {
 const getUserById = async (id) => {
   const query = `
     SELECT 
-      id, 
-      name, 
-      email, 
-      user_type, 
-      profile_image_url, 
-      profile_image_id,
-      phone,
-      birth_date,
-      address,
-      theme_preference,
-      notifications_preferences,
-      is_baptized,
-      baptism_date,
-      status
+      id, name, email, user_type, profile_image_url, profile_image_id,
+      phone, birth_date, address, theme_preference, notifications_preferences,
+      is_baptized, baptism_date, status
     FROM users 
     WHERE id = $1
   `;

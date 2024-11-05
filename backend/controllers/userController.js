@@ -1,18 +1,26 @@
+// backend/controllers/userController.js
+const { pool } = require("../config/db");
 const cloudinary = require("../config/cloudinary");
-const pool = require("../config/db");
-const { getUserById, updateUser } = require("../models/User");
 
 // Função para obter o perfil do usuário
 exports.getUserProfile = async (req, res) => {
   try {
-    const userId = req.user.userId;
-    const user = await getUserById(userId);
+    const userId = req.user.id;
+    const result = await pool.query(
+      `SELECT 
+        id, name, email, user_type, profile_image_url,
+        phone, birth_date, address, theme_preference, 
+        notifications_preferences, is_baptized, baptism_date, status
+       FROM users 
+       WHERE id = $1`,
+      [userId]
+    );
 
-    if (!user) {
+    if (result.rows.length === 0) {
       return res.status(404).json({ message: "Usuário não encontrado" });
     }
 
-    res.json(user);
+    res.json(result.rows[0]);
   } catch (error) {
     console.error("Erro ao buscar perfil:", error);
     res.status(500).json({
@@ -25,14 +33,52 @@ exports.getUserProfile = async (req, res) => {
 // Função para atualizar o perfil do usuário
 exports.updateUserProfile = async (req, res) => {
   try {
-    const userId = req.user.userId;
-    const updatedUser = await updateUser(userId, req.body);
+    const userId = req.user.id;
+    const {
+      name,
+      email,
+      phone,
+      birth_date,
+      address,
+      theme_preference,
+      notifications_preferences,
+      is_baptized,
+      baptism_date,
+    } = req.body;
 
-    if (!updatedUser) {
+    const result = await pool.query(
+      `UPDATE users 
+       SET name = COALESCE($1, name),
+           email = COALESCE($2, email),
+           phone = COALESCE($3, phone),
+           birth_date = COALESCE($4, birth_date),
+           address = COALESCE($5, address),
+           theme_preference = COALESCE($6, theme_preference),
+           notifications_preferences = COALESCE($7, notifications_preferences),
+           is_baptized = COALESCE($8, is_baptized),
+           baptism_date = COALESCE($9, baptism_date),
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $10
+       RETURNING *`,
+      [
+        name,
+        email,
+        phone,
+        birth_date,
+        address,
+        theme_preference,
+        notifications_preferences,
+        is_baptized,
+        baptism_date,
+        userId,
+      ]
+    );
+
+    if (result.rows.length === 0) {
       return res.status(404).json({ message: "Usuário não encontrado" });
     }
 
-    res.json(updatedUser);
+    res.json(result.rows[0]);
   } catch (error) {
     console.error("Erro ao atualizar perfil:", error);
     res.status(500).json({
@@ -50,7 +96,7 @@ exports.updateProfileImage = async (req, res) => {
       return res.status(400).json({ message: "Nenhuma imagem fornecida" });
     }
 
-    const userId = req.user.userId;
+    const userId = req.user.id;
 
     // Buscar usuário atual
     const userResult = await client.query(
@@ -75,7 +121,9 @@ exports.updateProfileImage = async (req, res) => {
 
     // Atualizar o usuário com a nova URL da imagem
     const updateResult = await client.query(
-      "UPDATE users SET profile_image_url = $1, profile_image_id = $2 WHERE id = $3 RETURNING *",
+      `UPDATE users 
+       SET profile_image_url = $1, profile_image_id = $2, updated_at = CURRENT_TIMESTAMP 
+       WHERE id = $3 RETURNING *`,
       [req.file.path, req.file.filename, userId]
     );
 
@@ -107,7 +155,6 @@ exports.registerUser = async (req, res) => {
     birth_date,
   } = req.body;
 
-  // Lógica para criar o usuário no banco de dados
   const query = `
     INSERT INTO users (name, email, password, user_type, is_baptized, baptism_date, phone, birth_date)
     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
@@ -129,6 +176,47 @@ exports.registerUser = async (req, res) => {
   } catch (error) {
     console.error("Erro ao registrar usuário:", error);
     res.status(500).json({ error: "Erro ao registrar usuário" });
+  }
+};
+
+// Função para deletar a conta do usuário
+exports.deleteUserAccount = async (req, res) => {
+  const userId = req.user.id;
+  const client = await pool.connect();
+  try {
+    // Buscar usuário atual
+    const userResult = await client.query(
+      "SELECT profile_image_id FROM users WHERE id = $1",
+      [userId]
+    );
+
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ message: "Usuário não encontrado" });
+    }
+
+    const user = userResult.rows[0];
+
+    // Se existe uma imagem, deletar do Cloudinary
+    if (user.profile_image_id) {
+      try {
+        await cloudinary.uploader.destroy(user.profile_image_id);
+      } catch (error) {
+        console.error("Erro ao deletar imagem do Cloudinary:", error);
+      }
+    }
+
+    // Deletar o usuário do banco de dados
+    await client.query("DELETE FROM users WHERE id = $1", [userId]);
+
+    res.json({ message: "Conta deletada com sucesso" });
+  } catch (error) {
+    console.error("Erro ao deletar conta do usuário:", error);
+    res.status(500).json({
+      message: "Erro ao deletar conta do usuário",
+      error: process.env.NODE_ENV === "development" ? error.message : undefined,
+    });
+  } finally {
+    client.release();
   }
 };
 

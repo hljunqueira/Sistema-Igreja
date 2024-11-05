@@ -1,5 +1,4 @@
-// src/components/Login/Login.js
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../../contexts/AuthContext";
 import { useNavigate, Link } from "react-router-dom";
 import {
@@ -14,37 +13,32 @@ import {
   InputAdornment,
   Paper,
   styled,
+  Fade,
 } from "@mui/material";
 import { Visibility, VisibilityOff } from "@mui/icons-material";
 
 // Styled components
 const LoginContainer = styled(Container)(({ theme }) => ({
-  minHeight: "100vh",
   display: "flex",
-  alignItems: "center",
   justifyContent: "center",
-  background: `linear-gradient(45deg, ${theme.palette.background.default} 0%, ${theme.palette.background.paper} 100%)`,
+  alignItems: "center",
+  height: "100vh", // Ocupa a altura total da tela
+  padding: theme.spacing(2),
 }));
 
 const LoginCard = styled(Paper)(({ theme }) => ({
-  padding: theme.spacing(4),
-  borderRadius: 16,
-  maxWidth: 400,
-  width: "100%",
-  backdropFilter: "blur(10px)",
-  backgroundColor: "rgba(30, 30, 30, 0.8)",
-  boxShadow: "0 8px 32px 0 rgba(0, 0, 0, 0.37)",
+  padding: theme.spacing(3),
+  maxWidth: 400, // Define uma largura máxima
+  width: "100%", // Garante que o card não ultrapasse a largura do container
 }));
 
 const LoginButton = styled(Button)(({ theme }) => ({
-  marginTop: theme.spacing(3),
-  marginBottom: theme.spacing(2),
-  padding: "12px",
-  fontSize: "1.1rem",
-  background: `linear-gradient(45deg, ${theme.palette.primary.main} 30%, ${theme.palette.primary.light} 90%)`,
-  "&:hover": {
-    background: `linear-gradient(45deg, ${theme.palette.primary.dark} 30%, ${theme.palette.primary.main} 90%)`,
-  },
+  marginTop: theme.spacing(2),
+}));
+
+const StyledLink = styled(Link)(({ theme }) => ({
+  textDecoration: "none",
+  color: theme.palette.primary.main,
 }));
 
 function Login() {
@@ -54,21 +48,34 @@ function Login() {
     showPassword: false,
   });
   const [validationErrors, setValidationErrors] = useState({});
+  const [attemptCount, setAttemptCount] = useState(0);
   const { login, error, loading, user } = useAuth();
   const navigate = useNavigate();
 
-  // Redirecionar se já estiver logado
+  const MAX_ATTEMPTS = 5;
+  const LOCKOUT_TIME = 15 * 60 * 1000; // 15 minutos em milissegundos
+
   useEffect(() => {
     if (user) {
       navigate("/home");
     }
   }, [user, navigate]);
 
-  const validateForm = () => {
+  useEffect(() => {
+    if (attemptCount >= MAX_ATTEMPTS) {
+      const timer = setTimeout(() => {
+        setAttemptCount(0);
+        setValidationErrors({});
+      }, LOCKOUT_TIME);
+      return () => clearTimeout(timer);
+    }
+  }, [LOCKOUT_TIME, attemptCount]);
+
+  const validateForm = useCallback(() => {
     const errors = {};
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-    if (!formData.email) {
+    if (!formData.email.trim()) {
       errors.email = "Email é obrigatório";
     } else if (!emailRegex.test(formData.email)) {
       errors.email = "Email inválido";
@@ -82,19 +89,20 @@ function Login() {
 
     setValidationErrors(errors);
     return Object.keys(errors).length === 0;
-  };
+  }, [formData.email, formData.password]);
 
-  const handleChange = (prop) => (event) => {
-    setFormData({ ...formData, [prop]: event.target.value });
-    // Limpa o erro do campo quando o usuário começa a digitar
-    if (validationErrors[prop]) {
-      setValidationErrors({ ...validationErrors, [prop]: null });
-    }
-  };
+  const handleChange = useCallback(
+    (prop) => (event) => {
+      const value = event.target.value.trim();
+      setFormData((prev) => ({ ...prev, [prop]: value }));
+      setValidationErrors((prev) => ({ ...prev, [prop]: null }));
+    },
+    []
+  );
 
-  const handleClickShowPassword = () => {
-    setFormData({ ...formData, showPassword: !formData.showPassword });
-  };
+  const handleClickShowPassword = useCallback(() => {
+    setFormData((prev) => ({ ...prev, showPassword: !prev.showPassword }));
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -103,134 +111,154 @@ function Login() {
       return;
     }
 
+    if (attemptCount >= MAX_ATTEMPTS) {
+      setValidationErrors({
+        email: `Muitas tentativas. Tente novamente após ${
+          LOCKOUT_TIME / 60000
+        } minutos.`,
+      });
+      return;
+    }
+
     try {
       const success = await login(formData.email, formData.password);
       if (success) {
         navigate("/home");
+      } else {
+        setAttemptCount((prev) => prev + 1);
       }
     } catch (err) {
       console.error("Erro no login:", err);
+      setAttemptCount((prev) => prev + 1);
     }
   };
 
   return (
     <LoginContainer>
-      <LoginCard elevation={6}>
-        <Box
-          sx={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            gap: 3,
-          }}
-        >
-          <Typography
-            component="h1"
-            variant="h4"
+      <Fade in={true} timeout={1000}>
+        <LoginCard elevation={6}>
+          <Box
             sx={{
-              fontWeight: "bold",
-              background: "linear-gradient(45deg, #90caf9 30%, #f48fb1 90%)",
-              WebkitBackgroundClip: "text",
-              WebkitTextFillColor: "transparent",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: 3,
             }}
           >
-            Casa de Oração
-          </Typography>
-
-          {error && (
-            <Alert severity="error" sx={{ width: "100%" }}>
-              {error}
-            </Alert>
-          )}
-
-          <Box component="form" onSubmit={handleSubmit} sx={{ width: "100%" }}>
-            <TextField
-              margin="normal"
-              required
-              fullWidth
-              id="email"
-              label="Email"
-              name="email"
-              autoComplete="email"
-              autoFocus
-              value={formData.email}
-              onChange={handleChange("email")}
-              error={!!validationErrors.email}
-              helperText={validationErrors.email}
-              sx={{ mb: 2 }}
-            />
-
-            <TextField
-              margin="normal"
-              required
-              fullWidth
-              name="password"
-              label="Senha"
-              type={formData.showPassword ? "text" : "password"}
-              id="password"
-              autoComplete="current-password"
-              value={formData.password}
-              onChange={handleChange("password")}
-              error={!!validationErrors.password}
-              helperText={validationErrors.password}
-              InputProps={{
-                endAdornment: (
-                  <InputAdornment position="end">
-                    <IconButton onClick={handleClickShowPassword} edge="end">
-                      {formData.showPassword ? (
-                        <VisibilityOff />
-                      ) : (
-                        <Visibility />
-                      )}
-                    </IconButton>
-                  </InputAdornment>
-                ),
+            <Typography
+              component="h1"
+              variant="h4"
+              sx={{
+                fontWeight: "bold",
+                background: "linear-gradient(45deg, #90caf9 30%, #f48fb1 90%)",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+                textAlign: "center",
               }}
-            />
-
-            <LoginButton
-              type="submit"
-              fullWidth
-              variant="contained"
-              disabled={loading}
             >
-              {loading ? (
-                <CircularProgress size={24} color="inherit" />
-              ) : (
-                "Entrar"
-              )}
-            </LoginButton>
+              Casa de Oração
+            </Typography>
+
+            {error && (
+              <Alert severity="error" sx={{ width: "100%" }}>
+                {error}
+              </Alert>
+            )}
 
             <Box
-              sx={{
-                display: "flex",
-                justifyContent: "space-between",
-                mt: 2,
-              }}
+              component="form"
+              onSubmit={handleSubmit}
+              sx={{ width: "100%" }}
+              noValidate
             >
-              <Link
-                to="/forgot-password"
-                style={{
-                  textDecoration: "none",
-                  color: "#90caf9",
-                }}
-              >
-                <Typography variant="body2">Esqueceu a senha?</Typography>
-              </Link>
+              <TextField
+                margin="normal"
+                required
+                fullWidth
+                id="email"
+                label="Email"
+                name="email"
+                autoComplete="email"
+                autoFocus
+                value={formData.email}
+                onChange={handleChange("email")}
+                error={!!validationErrors.email}
+                helperText={validationErrors.email}
+                sx={{ mb: 2 }}
+                disabled={loading || attemptCount >= MAX_ATTEMPTS}
+              />
 
-              <Link
-                to="/register"
-                style={{
-                  textDecoration: "none",
-                  color: "#90caf9",
+              <TextField
+                margin="normal"
+                required
+                fullWidth
+                name="password"
+                label="Senha"
+                type={formData.showPassword ? "text" : "password"}
+                id="password"
+                autoComplete="current-password"
+                value={formData.password}
+                onChange={handleChange("password")}
+                error={!!validationErrors.password}
+                helperText={validationErrors.password}
+                disabled={loading || attemptCount >= MAX_ATTEMPTS}
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton
+                        onClick={handleClickShowPassword}
+                        edge="end"
+                        disabled={loading || attemptCount >= MAX_ATTEMPTS}
+                      >
+                        {formData.showPassword ? (
+                          <VisibilityOff />
+                        ) : (
+                          <Visibility />
+                        )}
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                }}
+              />
+
+              {attemptCount > 0 && attemptCount < MAX_ATTEMPTS && (
+                <Typography variant="body2" color="error" sx={{ mt: 1 }}>
+                  Tentativas restantes: {MAX_ATTEMPTS - attemptCount}
+                </Typography>
+              )}
+
+              <LoginButton
+                type="submit"
+                fullWidth
+                variant="contained"
+                disabled={loading || attemptCount >= MAX_ATTEMPTS}
+              >
+                {loading ? (
+                  <CircularProgress size={24} color="inherit" />
+                ) : (
+                  "Entrar"
+                )}
+              </LoginButton>
+
+              <Box
+                sx={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  mt: 2,
                 }}
               >
-                <Typography variant="body2">Criar uma conta</Typography>
-              </Link>
+                <StyledLink to="/forgot-password">
+                  <Typography variant="body2"> Esqueceu a senha?</Typography>
+                </StyledLink>
+
+                <StyledLink to="/register">
+                  <Typography variant="body2">Criar uma conta</Typography>
+                </StyledLink>
+              </Box>
             </Box>
           </Box>
-        </Box>
-      </LoginCard>
+        </LoginCard>
+      </Fade>
     </LoginContainer>
   );
 }

@@ -33,4 +33,7 @@ router.put(
   passwordController.changePassword
 );
 
+// Rota para deletar a conta do usuário (opcional)
+router.delete("/profile", authMiddleware, userController.deleteUserAccount);
+
 module.exports = router;

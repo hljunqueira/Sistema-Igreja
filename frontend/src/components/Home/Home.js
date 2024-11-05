@@ -4,13 +4,14 @@ import { Container, Typography, Grid, Paper, Box } from "@mui/material";
 import { useAuth } from "../../contexts/AuthContext";
 
 function Home() {
-  const { user } = useAuth();
+  const { user } = useAuth(); // Obtém informações do usuário do contexto de autenticação
 
   return (
     <Container maxWidth="lg">
       <Box sx={{ mt: 4 }}>
         <Typography variant="h4" gutterBottom>
-          Bem-vindo, {user.name}!
+          Bem-vindo, {user?.name || "Visitante"}!{" "}
+          {/* Exibe o nome do usuário ou "Visitante" se não estiver logado */}
         </Typography>
         <Grid container spacing={3}>
           <Grid item xs={12} md={6}>

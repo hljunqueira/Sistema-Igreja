@@ -1,4 +1,4 @@
-// src/services/api.js
+// frontend/src/services/api.js
 import axios from "axios";
 
 const API_URL = "http://localhost:3001/api";
@@ -62,7 +62,7 @@ api.interceptors.response.use(
 export const loginUser = async (email, password) => {
   try {
     console.log("Tentando login com:", { email });
-    const response = await api.post("/login", { email, password });
+    const response = await api.post("/auth/login", { email, password });
 
     // Se o login for bem-sucedido, armazena o token
     if (response.data.token) {
@@ -80,7 +80,11 @@ export const loginUser = async (email, password) => {
 export const registerUser = async (name, email, password) => {
   try {
     console.log("Tentando registrar usuário:", { name, email });
-    const response = await api.post("/register", { name, email, password });
+    const response = await api.post("/auth/register", {
+      name,
+      email,
+      password,
+    });
     return response.data;
   } catch (error) {
     console.error("Erro no registro:", error);
@@ -117,7 +121,7 @@ export const updateUserData = async (userData) => {
 // Função para verificar se o token está válido
 export const checkAuthToken = async () => {
   try {
-    const response = await api.get("/verify-token");
+    const response = await api.get("/auth/verify-auth");
     return response.status === 200;
   } catch (error) {
     console.error("Erro ao verificar token:", error);
@@ -131,7 +135,7 @@ export const logoutUser = async () => {
     const token = localStorage.getItem("authToken");
     if (token) {
       await api.post(
-        "/logout",
+        "/auth/logout",
         {},
         {
           headers: { Authorization: `Bearer ${token}` },

@@ -1,6 +1,6 @@
-// src/contexts/AuthContext.js
+// frontend/src/contexts/AuthContext.js
 import React, { createContext, useState, useContext, useEffect } from "react";
-import api, { setAuthToken } from "../services/api"; // Certifique-se de que este caminho está correto
+import api, { setAuthToken } from "../services/api";
 
 const AuthContext = createContext(null);
 
@@ -14,10 +14,10 @@ export const AuthProvider = ({ children }) => {
     const loadUser = async () => {
       const token = localStorage.getItem("authToken");
       if (token) {
+        setAuthToken(token);
         try {
-          setAuthToken(token);
-          const response = await api.get("/user"); // Ajuste esta rota conforme sua API
-          setUser(response.data);
+          const response = await api.get("/auth/verify-auth");
+          setUser(response.data.user);
         } catch (err) {
           console.error("Erro ao carregar usuário:", err);
           localStorage.removeItem("authToken");
@@ -34,15 +34,12 @@ export const AuthProvider = ({ children }) => {
     try {
       setError(null);
       setLoading(true);
-
-      const response = await api.post("/login", { email, password }); // Ajuste esta rota conforme sua API
+      const response = await api.post("/auth/login", { email, password });
       const { token, user } = response.data;
 
       localStorage.setItem("authToken", token);
       setAuthToken(token);
       setUser(user);
-
-      console.log("Usuário após login:", user); // Para debug
       return true;
     } catch (err) {
       console.error("Erro no login:", err);
@@ -57,21 +54,20 @@ export const AuthProvider = ({ children }) => {
     try {
       setError(null);
       setLoading(true);
+      const response = await api.post("/auth/register", userData);
 
-      const response = await api.post("/register", userData); // Ajuste esta rota conforme sua API
-
-      // Se o registro for bem-sucedido e retornar um token, fazer login automático
+      // Se o registro for bem-sucedido, armazena o token e o usuário
       if (response.data.token) {
-        localStorage.setItem("authToken", response.data.token); // Armazena o token
-        setAuthToken(response.data.token); // Define o token para futuras requisições
-        setUser(response.data.user); // Define o usuário no estado
+        localStorage.setItem("authToken", response.data.token);
+        setAuthToken(response.data.token);
+        setUser(response.data.user);
       }
 
-      return { success: true, data: response.data }; // Retorna sucesso e dados
+      return { success: true, data: response.data };
     } catch (err) {
       console.error("Erro no registro:", err);
       setError(err.response?.data?.message || "Erro ao registrar usuário");
-      return { success: false, error: err.response?.data?.message }; // Retorna erro
+      return { success: false, error: err.response?.data?.message };
     } finally {
       setLoading(false);
     }
@@ -86,7 +82,7 @@ export const AuthProvider = ({ children }) => {
   const updateUser = async (userData) => {
     try {
       setError(null);
-      const response = await api.put("/user", userData); // Ajuste esta rota conforme sua API
+      const response = await api.put("/user", userData);
       setUser(response.data); // Atualiza o usuário com os dados retornados
       return true;
     } catch (err) {
@@ -97,15 +93,7 @@ export const AuthProvider = ({ children }) => {
 
   return (
     <AuthContext.Provider
-      value={{
-        user,
-        loading,
-        error,
-        login,
-        logout,
-        register, // Certifique-se de incluir register aqui
-        updateUser,
-      }}
+      value={{ user, loading, error, login, logout, register, updateUser }}
     >
       {children}
     </AuthContext.Provider>
