@@ -56,7 +56,8 @@ exports.updateUserProfile = async (req, res) => {
            address = COALESCE($5, address),
            theme_preference = COALESCE($6, theme_preference),
            notifications_preferences = COALESCE($7, notifications_preferences),
-           is_baptized = COALESCE($8, is_baptized),
+           is_baptized = CO 
+           COALESCE($8, is_baptized),
            baptism_date = COALESCE($9, baptism_date),
            updated_at = CURRENT_TIMESTAMP
        WHERE id = $10
@@ -103,6 +104,7 @@ exports.updateProfileImage = async (req, res) => {
     const userId = req.user.id;
     const filePath = path.resolve(req.file.path);
     console.log("Caminho completo do arquivo:", filePath);
+    console.log("Tamanho do arquivo:", req.file.size); // Nova linha para verificar o tamanho
 
     // Buscar usuário atual
     const userResult = await client.query(
@@ -127,15 +129,21 @@ exports.updateProfileImage = async (req, res) => {
 
     // Upload para o Cloudinary com transformações
     console.log("Iniciando upload para Cloudinary");
-    const result = await cloudinary.uploader.upload(filePath, {
-      folder: "profile-images",
-      transformation: [
-        { width: 500, height: 500, crop: "limit" },
-        { quality: "auto" },
-        { fetch_format: "auto" },
-      ],
-    });
-    console.log("Resultado do upload Cloudinary:", result);
+    let result;
+    try {
+      result = await cloudinary.uploader.upload(filePath, {
+        folder: "profile-images",
+        transformation: [
+          { width: 500, height: 500, crop: "limit" },
+          { quality: "auto" },
+          { fetch_format: "auto" },
+        ],
+      });
+      console.log("Resultado do upload Cloudinary:", result);
+    } catch (cloudinaryError) {
+      console.error("Erro detalhado do Cloudinary:", cloudinaryError);
+      throw cloudinaryError;
+    }
 
     // Atualizar o usuário com a nova URL da imagem
     const updateResult = await client.query(
@@ -192,7 +200,8 @@ exports.registerUser = async (req, res) => {
 
   const query = `
     INSERT INTO users (name, email, password, user_type, is_baptized, baptism_date, phone, birth_date)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    VALUES ($1, $2, $3, $4, $5, $6, $
+7, $8)
     RETURNING id
   `;
 

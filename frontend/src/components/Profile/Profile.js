@@ -1,5 +1,5 @@
 // src/components/Profile/Profile.js
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   Container,
   Typography,
@@ -14,11 +14,168 @@ import {
   FormControlLabel,
   Switch,
   CircularProgress,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Stack,
 } from "@mui/material";
 import { useAuth } from "../../contexts/AuthContext";
 import api from "../../services/api";
 import { Link } from "react-router-dom";
+import { Camera, PhotoCamera, Upload } from "@mui/icons-material";
 
+// Componente para captura de foto
+const WebcamCapture = ({ onCapture, onClose }) => {
+  const videoRef = useRef(null);
+  const [stream, setStream] = useState(null);
+  const [cameraReady, setCameraReady] = useState(false);
+
+  const stopCamera = useCallback(() => {
+    if (stream) {
+      stream.getTracks().forEach((track) => {
+        track.stop();
+        console.log("Camera track stopped:", track.label);
+      });
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    setCameraReady(false);
+  }, [stream]);
+
+  useEffect(() => {
+    const startCamera = async () => {
+      try {
+        console.log("Iniciando câmera...");
+        const mediaStream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+            facingMode: "user",
+          },
+          audio: false,
+        });
+        console.log("Stream obtido:", mediaStream);
+
+        setStream(mediaStream);
+        if (videoRef.current) {
+          console.log("Definindo srcObject do vídeo");
+          videoRef.current.srcObject = mediaStream;
+          videoRef.current.onloadedmetadata = () => {
+            console.log("Vídeo metadata carregado");
+            setCameraReady(true);
+          };
+        } else {
+          console.log("Referência do vídeo não encontrada");
+        }
+      } catch (err) {
+        console.error("Erro detalhado ao acessar câmera:", err);
+        alert("Erro ao acessar câmera. Verifique as permissões.");
+      }
+    };
+
+    startCamera();
+
+    return stopCamera;
+  }, [stopCamera]);
+
+  const capturePhoto = () => {
+    if (!videoRef.current) return;
+
+    const canvas = document.createElement("canvas");
+    canvas.width = videoRef.current.videoWidth;
+    canvas.height = videoRef.current.videoHeight;
+
+    const context = canvas.getContext("2d");
+    context.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+
+    canvas.toBlob(
+      (blob) => {
+        if (blob.size < 1000) {
+          console.error(
+            "Imagem capturada é muito pequena:",
+            blob.size,
+            "bytes"
+          );
+          alert("Erro ao capturar imagem. Por favor, tente novamente.");
+          return;
+        }
+        const file = new File([blob], "webcam-photo.jpg", {
+          type: "image/jpeg",
+        });
+        onCapture(file);
+        stopCamera();
+      },
+      "image/jpeg",
+      0.95
+    );
+  };
+
+  return (
+    <Dialog
+      open={true}
+      onClose={() => {
+        stopCamera();
+        onClose();
+      }}
+      maxWidth="md"
+      fullWidth
+    >
+      <DialogTitle>Tirar Foto</DialogTitle>
+      <DialogContent>
+        <Box
+          sx={{
+            position: "relative",
+            width: "100%",
+            height: "400px",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            overflow: "hidden",
+          }}
+        >
+          {!cameraReady && (
+            <CircularProgress
+              sx={{ position: "absolute", top: "50%", left: "50%" }}
+            />
+          )}
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+              display: cameraReady ? "block" : "none",
+            }}
+          />
+        </Box>
+      </DialogContent>
+      <DialogActions>
+        <Button
+          onClick={() => {
+            stopCamera();
+            onClose();
+          }}
+        >
+          Cancelar
+        </Button>
+        <Button
+          onClick={capturePhoto}
+          startIcon={<Camera />}
+          color="primary"
+          variant="contained"
+        >
+          Capturar
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+};
+
+// O resto do código permanece igual
 function Profile() {
   const { user } = useAuth();
   const [formData, setFormData] = useState({
@@ -52,7 +209,6 @@ function Profile() {
     setSnackbar({ open: true, message, severity });
   }, []);
 
-  // Função para buscar os dados do usuário
   const fetchUserData = useCallback(async () => {
     try {
       const response = await api.get("/user/profile");
@@ -170,6 +326,8 @@ function Profile() {
     }
   };
 
+  const [showCamera, setShowCamera] = useState(false);
+
   if (loading) {
     return (
       <Box
@@ -205,24 +363,38 @@ function Profile() {
                 src={formData.profile_image_url}
                 sx={{ width: 100, height: 100, margin: "auto", mb: 2 }}
               />
-              <Button variant="outlined" component="label">
-                Alterar Foto
-                <input type="file" hidden onChange={handleImageUpload} />
-              </Button>
-              <Typography variant="subtitle1" sx={{ mt: 2 }}>
-                {formData.name}
-              </Typography>
-              <Typography variant="body2" color="textSecondary">
-                {user?.user_type || "membro"}
-              </Typography>
-              <Button
-                variant="text"
-                component={Link}
-                to="/change-password"
-                sx={{ mt: 2 }}
-              >
-                Alterar Senha
-              </Button>
+              <Stack direction="row" spacing={2} justifyContent="center">
+                <Button
+                  variant="outlined"
+                  startIcon={<Upload />}
+                  component="label"
+                >
+                  Carregar Foto
+                  <input
+                    type="file"
+                    hidden
+                    onChange={handleImageUpload}
+                    accept="image/*"
+                  />
+                </Button>
+                <Button
+                  variant="outlined"
+                  startIcon={<PhotoCamera />}
+                  onClick={() => setShowCamera(true)}
+                >
+                  Tirar Foto
+                </Button>
+              </Stack>
+
+              {showCamera && (
+                <WebcamCapture
+                  onCapture={(file) => {
+                    handleImageUpload({ target: { files: [file] } });
+                    setShowCamera(false);
+                  }}
+                  onClose={() => setShowCamera(false)}
+                />
+              )}
             </Paper>
           </Grid>
 
@@ -342,6 +514,15 @@ function Profile() {
                       disabled={saving}
                     >
                       {saving ? "Salvando..." : "Salvar"}
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      color="primary"
+                      component={Link}
+                      to="/change-password"
+                      sx={{ mt: 2, ml: 2 }}
+                    >
+                      Alterar Senha
                     </Button>
                   </Grid>
                 </Grid>
