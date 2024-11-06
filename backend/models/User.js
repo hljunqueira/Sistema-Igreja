@@ -1,6 +1,6 @@
-// backend/models/User.js
 const { pool } = require("../config/db");
 
+// Função para criar a tabela de usuários
 const createUserTable = async () => {
   try {
     const query = `
@@ -32,6 +32,7 @@ const createUserTable = async () => {
   }
 };
 
+// Função para adicionar colunas que estão faltando
 const addMissingColumns = async () => {
   try {
     const columnsToAdd = [
@@ -78,12 +79,14 @@ const addMissingColumns = async () => {
   }
 };
 
+// Função para obter usuário por email
 const getUserByEmail = async (email) => {
   const query = "SELECT * FROM users WHERE email = $1";
   const result = await pool.query(query, [email]);
   return result.rows[0];
 };
 
+// Função para obter usuário por ID
 const getUserById = async (id) => {
   const query = `
     SELECT 
@@ -97,6 +100,7 @@ const getUserById = async (id) => {
   return result.rows[0];
 };
 
+// Função para atualizar usuário
 const updateUser = async (id, userData) => {
   const query = `
     UPDATE users
@@ -133,10 +137,59 @@ const updateUser = async (id, userData) => {
   return result.rows[0];
 };
 
+// Função para criar a tabela de pastores
+const createPastorTable = async () => {
+  try {
+    const query = `
+      CREATE TABLE IF NOT EXISTS pastores (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id),
+        data_ordenacao DATE,
+        formacao TEXT,
+        especializacoes TEXT[],
+        biografia TEXT,
+        status VARCHAR(20) DEFAULT 'ativo',
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      )
+    `;
+    await pool.query(query);
+    console.log("Tabela de pastores verificada/criada com sucesso");
+  } catch (error) {
+    console.error("Erro ao criar tabela de pastores:", error);
+    throw error;
+  }
+};
+
+// Função para criar a tabela de líderes
+const createLiderTable = async () => {
+  try {
+    const query = `
+      CREATE TABLE IF NOT EXISTS lideres (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id),
+        area_lideranca VARCHAR(100),
+        descricao_funcao TEXT,
+        data_inicio DATE,
+        status VARCHAR(20) DEFAULT 'ativo',
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      )
+    `;
+    await pool.query(query);
+    console.log("Tabela de líderes verificada/criada com sucesso");
+  } catch (error) {
+    console.error("Erro ao criar tabela de líderes:", error);
+    throw error;
+  }
+};
+
 module.exports = {
   createUserTable,
   addMissingColumns,
   getUserByEmail,
   getUserById,
   updateUser,
+  createPastorTable,
+  createLiderTable,
 };

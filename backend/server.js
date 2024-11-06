@@ -7,7 +7,12 @@ const authRoutes = require("./routes/authRoutes");
 const userRoutes = require("./routes/userRoutes");
 const adminRoutes = require("./routes/adminRoutes");
 const { testConnection } = require("./config/db");
-const { createUserTable, addMissingColumns } = require("./models/User");
+const {
+  createUserTable,
+  addMissingColumns,
+  createPastorTable,
+  createLiderTable,
+} = require("./models/User");
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -45,6 +50,8 @@ const startServer = async () => {
     await testConnection(); // Testar conexão com o banco de dados
     await createUserTable(); // Criar tabela de usuários se não existir
     await addMissingColumns(); // Adicionar colunas faltantes
+    await createPastorTable(); // Criar tabela de pastores
+    await createLiderTable(); // Criar tabela de líderes
     app.listen(PORT, () => {
       console.log(`Servidor rodando na porta ${PORT}`);
     });

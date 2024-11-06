@@ -151,4 +151,28 @@ export const logoutUser = async () => {
   }
 };
 
+// Função para salvar informações do pastor
+export const savePastorInfo = async (pastorData) => {
+  try {
+    const response = await api.post("/admin/pastores", pastorData);
+    return response.data;
+  } catch (error) {
+    throw new Error(
+      error.response?.data?.message || "Erro ao salvar informações do pastor"
+    );
+  }
+};
+
+// Função para salvar informações do líder
+export const saveLiderInfo = async (liderData) => {
+  try {
+    const response = await api.post("/admin/lideres", liderData);
+    return response.data;
+  } catch (error) {
+    throw new Error(
+      error.response?.data?.message || "Erro ao salvar informações do líder"
+    );
+  }
+};
+
 export default api;
