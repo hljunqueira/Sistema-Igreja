@@ -1,7 +1,8 @@
+// src/App.js
 import React from "react";
 import { CssBaseline } from "@mui/material";
 import Navigation from "./components/Navigation/Navigation";
-import Routes from "./Routes";
+import AppRoutes from "./Routes";
 
 function App() {
   return (
@@ -9,7 +10,7 @@ function App() {
       <CssBaseline />
       <div className="App">
         <Navigation />
-        <Routes />
+        <AppRoutes />
       </div>
     </>
   );

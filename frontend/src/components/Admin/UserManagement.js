@@ -24,6 +24,8 @@ import {
   DialogActions,
   Snackbar,
 } from "@mui/material";
+import jsPDF from "jspdf";
+import "jspdf-autotable";
 import MuiAlert from "@mui/material/Alert";
 import { CSVLink } from "react-csv";
 import { useAuth } from "../../contexts/AuthContext";
@@ -40,6 +42,7 @@ function UserManagement() {
   const [filter, setFilter] = useState({
     userType: "all",
     isBaptized: "all",
+    status: "all",
   });
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedUser, setSelectedUser] = useState(null);
@@ -66,11 +69,39 @@ function UserManagement() {
   const fetchUsers = async () => {
     try {
       const response = await api.get("/admin/users");
-      setUsers(response.data);
+      setUsers(
+        response.data.map((user) => ({
+          ...user,
+          status: user.status || "Pendente", // Define status padrão
+        }))
+      );
       setLoading(false);
     } catch (error) {
       setError("Erro ao buscar usuários");
       setLoading(false);
+    }
+  };
+
+  const handleStatusChange = async (userId, newStatus) => {
+    try {
+      await api.put(`/admin/users/${userId}/status`, { status: newStatus });
+      setUsers(
+        users.map((user) =>
+          user.id === userId ? { ...user, status: newStatus } : user
+        )
+      );
+      setSnackbar({
+        open: true,
+        message: "Status atualizado com sucesso",
+        severity: "success",
+      });
+    } catch (error) {
+      console.error("Erro ao atualizar status:", error);
+      setSnackbar({
+        open: true,
+        message: "Erro ao atualizar status",
+        severity: "error",
+      });
     }
   };
 
@@ -98,7 +129,8 @@ function UserManagement() {
     (user) =>
       (filter.userType === "all" || user.user_type === filter.userType) &&
       (filter.isBaptized === "all" ||
-        user.is_baptized === (filter.isBaptized === "true")) &&
+        user.is_baptized === (filter.isBaptized === "Sim")) &&
+      (filter.status === "all" || user.status === filter.status) &&
       (user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         user.email.toLowerCase().includes(searchTerm.toLowerCase()))
   );
@@ -235,6 +267,69 @@ function UserManagement() {
     }
   };
 
+  const exportToPDF = () => {
+    setSnackbar({
+      open: true,
+      message: "Gerando PDF...",
+      severity: "info",
+    });
+
+    const maxRecords = 1000;
+    const dataToExport = users.slice(0, maxRecords);
+    const doc = new jsPDF();
+
+    doc.text("Lista de Usuários", 14, 15);
+
+    const columns = [
+      "Nome",
+      "Email",
+      "Tipo",
+      "Batizado",
+      "Telefone",
+      "Data de Nascimento",
+      "Status",
+    ];
+
+    const data = dataToExport.map((user) => [
+      user.name,
+      user.email,
+      user.user_type,
+      user.is_baptized ? "Sim" : "Não",
+      user.phone || "",
+      user.birth_date || "",
+      user.status || "",
+    ]);
+
+    doc.autoTable({
+      head: [columns],
+      body: data,
+      startY: 20,
+      styles: {
+        fontSize: 8,
+        cellPadding: 2,
+        overflow: "linebreak",
+        cellWidth: "wrap",
+      },
+      columnStyles: {
+        0: { cellWidth: 30 },
+        1: { cellWidth: 40 },
+        2: { cellWidth: 20 },
+        3: { cellWidth: 15 },
+        4: { cellWidth: 25 },
+        5: { cellWidth: 25 },
+        6: { cellWidth: 20 },
+      },
+    });
+
+    doc.save("usuarios.pdf");
+
+    setSnackbar({
+      open: true,
+      message: "PDF gerado com sucesso!",
+      severity: "success",
+    });
+  };
+
   if (loading) {
     return <Typography>Carregando...</Typography>;
   }
@@ -280,21 +375,36 @@ function UserManagement() {
             </Select>
           </FormControl>
 
+          <FormControl sx={{ minWidth: 120, mr: 2 }}>
+            <InputLabel>Status</InputLabel>
+            <Select
+              value={filter.status}
+              onChange={(e) => setFilter({ ...filter, status: e.target.value })}
+            >
+              <MenuItem value="all">Todos</MenuItem>
+              <MenuItem value="Pendente">Pendente</MenuItem>
+              <MenuItem value="Ativo">Ativo</MenuItem>
+              <MenuItem value="Inativo">Inativo</MenuItem>
+            </Select>
+          </FormControl>
+
           <TextField
-            label="Buscar Usuário"
+            label="Pesquisar"
             variant="outlined"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             sx={{ mr: 2 }}
           />
 
+          <Button variant="contained" onClick={exportToPDF}>
+            Exportar PDF
+          </Button>
           <CSVLink
             data={csvData}
             headers={csvHeaders}
             filename={"usuarios.csv"}
-            className="btn btn-primary"
           >
-            <Button variant="contained" color="primary">
+            <Button variant="contained" sx={{ ml: 2 }}>
               Exportar CSV
             </Button>
           </CSVLink>
@@ -306,8 +416,9 @@ function UserManagement() {
               <TableRow>
                 <TableCell>Nome</TableCell>
                 <TableCell>Email</TableCell>
-                <TableCell>Tipo</TableCell>
+                <TableCell> Tipo</TableCell>
                 <TableCell>Batizado</TableCell>
+                <TableCell>Status</TableCell>
                 <TableCell>Ações</TableCell>
               </TableRow>
             </TableHead>
@@ -318,19 +429,24 @@ function UserManagement() {
                   <TableCell>{user.email}</TableCell>
                   <TableCell>{user.user_type}</TableCell>
                   <TableCell>{user.is_baptized ? "Sim" : "Não"}</TableCell>
+                  <TableCell>{user.status || "Pendente"}</TableCell>
                   <TableCell>
-                    <Button
-                      variant="outlined"
-                      onClick={() => handleOpenUserTypeDialog(user.id)}
-                    >
-                      Alterar Tipo
+                    <Button onClick={() => handleOpenUserTypeDialog(user.id)}>
+                      Editar
+                    </Button>
+                    <Button onClick={() => handleBulkAction("delete", user.id)}>
+                      Excluir
                     </Button>
                     <Button
-                      variant="outlined"
-                      color="error"
-                      onClick={() => handleBulkAction("delete", user.id)}
+                      onClick={() =>
+                        handleStatusChange(
+                          user.id,
+                          user.status === "Ativo" ? "Pendente" : "Ativo"
+                        )
+                      }
                     >
-                      Deletar
+                      Mudar Status para{" "}
+                      {user.status === "Ativo" ? "Pendente" : "Ativo"}
                     </Button>
                   </TableCell>
                 </TableRow>
@@ -348,6 +464,16 @@ function UserManagement() {
           onPageChange={handleChangePage}
           onRowsPerPageChange={handleChangeRowsPerPage}
         />
+
+        <Snackbar
+          open={snackbar.open}
+          autoHideDuration={6000}
+          onClose={() => handleCloseSnackbar({ ...snackbar, open: false })}
+        >
+          <MuiAlert elevation={6} variant="filled" severity={snackbar.severity}>
+            {snackbar.message}
+          </MuiAlert>
+        </Snackbar>
       </Container>
 
       {/* Diálogo para alteração de tipo de usuário */}
@@ -395,22 +521,6 @@ function UserManagement() {
           data={selectedUser ? selectedUser.liderData : {}}
         />
       )}
-
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={6000}
-        onClose={handleCloseSnackbar}
-        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
-      >
-        <MuiAlert
-          elevation={6}
-          variant="filled"
-          onClose={handleCloseSnackbar}
-          severity={snackbar.severity}
-        >
-          {snackbar.message}
-        </MuiAlert>
-      </Snackbar>
     </>
   );
 }

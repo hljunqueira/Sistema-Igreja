@@ -52,12 +52,17 @@ function Navigation() {
                 </>
               )}
 
+              {/* Link para eventos */}
+              <Button color="inherit" component={Link} to="/events">
+                {user?.user_type === "administrador"
+                  ? "Gerenciar Eventos"
+                  : "Eventos"}
+              </Button>
+
               <Button color="inherit" component={Link} to="/profile">
                 Perfil
               </Button>
               <Button color="inherit" onClick={handleLogout}>
-                {" "}
-                {/* Alterar para usar handleLogout */}
                 Sair
               </Button>
             </>

@@ -1,3 +1,4 @@
+// backend/models/User.js
 const { pool } = require("../config/db");
 
 // Função para criar a tabela de usuários
@@ -75,6 +76,66 @@ const addMissingColumns = async () => {
     }
   } catch (error) {
     console.error("Erro ao adicionar colunas:", error);
+    throw error;
+  }
+};
+
+// Função para criar usuário (NOVA)
+const createUser = async (userData) => {
+  try {
+    const {
+      name,
+      email,
+      password,
+      user_type = "visitante",
+      phone,
+      birth_date,
+      is_baptized = false,
+      baptism_date,
+      address = {},
+      theme_preference = "light",
+      notifications_preferences = { email: true, push: true },
+      status = "pending",
+    } = userData;
+
+    const query = `
+      INSERT INTO users (
+        name,
+        email,
+        password,
+        user_type,
+        phone,
+        birth_date,
+        is_baptized,
+        baptism_date,
+        address,
+        theme_preference,
+        notifications_preferences,
+        status
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+      RETURNING id, name, email, user_type, status
+    `;
+
+    const values = [
+      name,
+      email,
+      password,
+      user_type,
+      phone,
+      birth_date,
+      is_baptized,
+      baptism_date,
+      JSON.stringify(address),
+      theme_preference,
+      JSON.stringify(notifications_preferences),
+      status,
+    ];
+
+    const result = await pool.query(query, values);
+    return result.rows[0];
+  } catch (error) {
+    console.error("Erro ao criar usuário:", error);
     throw error;
   }
 };
@@ -170,8 +231,7 @@ const createLiderTable = async () => {
         user_id INTEGER REFERENCES users(id),
         area_lideranca VARCHAR(100),
         descricao_funcao TEXT,
-        data_inicio DATE,
-        status VARCHAR(20) DEFAULT 'ativo',
+        data_inicio DATE, status VARCHAR(20) DEFAULT 'ativo',
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       )
@@ -192,4 +252,5 @@ module.exports = {
   updateUser,
   createPastorTable,
   createLiderTable,
+  createUser, // Adicionada a função createUser
 };

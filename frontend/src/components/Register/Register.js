@@ -47,7 +47,7 @@ function Registrar() {
     mensagem: "",
     severidade: "",
   });
-  const { registrar, carregando } = useAuth();
+  const { register, loading } = useAuth();
   const navegar = useNavigate();
 
   const handleChange = (e) => {
@@ -91,38 +91,38 @@ function Registrar() {
 
     try {
       const dadosRegistro = {
-        nome: dadosFormulario.nome,
+        name: dadosFormulario.nome, // Alterado para 'name' para corresponder à API
         email: dadosFormulario.email,
-        senha: dadosFormulario.senha,
-        tipo_usuario: "visitante",
-        telefone: dadosFormulario.telefone,
-        data_nascimento: dadosFormulario.dataNascimento
-          ? dayjs(dadosFormulario.dataNascimento).format("DD/MM/YYYY")
+        password: dadosFormulario.senha, // Alterado para 'password' para corresponder à API
+        user_type: "visitante",
+        phone: dadosFormulario.telefone, // Alterado para 'phone' para corresponder à API
+        birth_date: dadosFormulario.dataNascimento
+          ? dayjs(dadosFormulario.dataNascimento).format("YYYY-MM-DD")
           : null,
-        eh_batizado: dadosFormulario.ehBatizado,
-        data_batismo: dadosFormulario.dataBatismo
-          ? dayjs(dadosFormulario.dataBatismo).format("DD/MM/YYYY")
+        is_baptized: dadosFormulario.ehBatizado, // Alterado para 'is_baptized' para corresponder à API
+        baptism_date: dadosFormulario.dataBatismo
+          ? dayjs(dadosFormulario.dataBatismo).format("YYYY-MM-DD")
           : null,
       };
 
-      const resultado = await registrar(dadosRegistro);
+      const resultado = await register(dadosRegistro);
 
-      if (resultado.sucesso) {
+      if (resultado.success) {
         setSnackbar({
           aberto: true,
           mensagem: "Registro realizado com sucesso!",
-          severidade: "sucesso",
+          severidade: "success",
         });
 
-        // Redirecionar após um breve delay
         setTimeout(() => {
           navegar("/sucesso-registro");
         }, 2000);
       } else {
-        setErro(resultado.erro || "Erro ao registrar usuário");
+        setErro(resultado.error || "Erro ao registrar usuário");
       }
     } catch (err) {
-      setErro(err.message);
+      console.error("Erro no registro:", err);
+      setErro(err.message || "Erro ao registrar usuário");
     }
   };
 
@@ -152,6 +152,7 @@ function Registrar() {
             name="nome"
             value={dadosFormulario.nome}
             onChange={handleChange}
+            autoComplete="name"
           />
 
           <TextField
@@ -163,6 +164,7 @@ function Registrar() {
             type="email"
             value={dadosFormulario.email}
             onChange={handleChange}
+            autoComplete="email"
           />
 
           <TextField
@@ -174,6 +176,7 @@ function Registrar() {
             type="password"
             value={dadosFormulario.senha}
             onChange={handleChange}
+            autoComplete="new-password"
           />
 
           <TextField
@@ -185,6 +188,7 @@ function Registrar() {
             type="password"
             value={dadosFormulario.confirmarSenha}
             onChange={handleChange}
+            autoComplete="new-password"
           />
 
           <TextField
@@ -194,6 +198,7 @@ function Registrar() {
             name="telefone"
             value={dadosFormulario.telefone}
             onChange={handleChange}
+            autoComplete="tel"
           />
 
           <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale={ptBR}>
@@ -242,9 +247,9 @@ function Registrar() {
             fullWidth
             variant="contained"
             sx={{ mt: 3, mb: 2 }}
-            disabled={carregando}
+            disabled={loading}
           >
-            {carregando ? "Registrando..." : "Registrar"}
+            {loading ? "Registrando..." : "Registrar"}
           </Button>
 
           <Box sx={{ mt: 2, textAlign: "center" }}>

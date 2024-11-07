@@ -6,6 +6,7 @@ const rateLimit = require("express-rate-limit");
 const authRoutes = require("./routes/authRoutes");
 const userRoutes = require("./routes/userRoutes");
 const adminRoutes = require("./routes/adminRoutes");
+const eventRoutes = require("./routes/eventRoutes");
 const { testConnection } = require("./config/db");
 const {
   createUserTable,
@@ -13,6 +14,7 @@ const {
   createPastorTable,
   createLiderTable,
 } = require("./models/User");
+const { createEventTable } = require("./models/Event");
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -43,15 +45,17 @@ app.use((req, res, next) => {
 app.use("/api/auth", authRoutes); // Rotas de autenticação
 app.use("/api/user", userRoutes); // Rotas de usuário
 app.use("/api/admin", adminRoutes); // Rotas de admin
+app.use("/api/events", eventRoutes); // Rotas de eventos
 
 // Iniciar o servidor
 const startServer = async () => {
   try {
-    await testConnection(); // Testar conexão com o banco de dados
-    await createUserTable(); // Criar tabela de usuários se não existir
-    await addMissingColumns(); // Adicionar colunas faltantes
-    await createPastorTable(); // Criar tabela de pastores
-    await createLiderTable(); // Criar tabela de líderes
+    await testConnection();
+    await createUserTable();
+    await addMissingColumns();
+    await createPastorTable();
+    await createLiderTable();
+    await createEventTable(); // Certifique-se de que esta linha está presente
     app.listen(PORT, () => {
       console.log(`Servidor rodando na porta ${PORT}`);
     });

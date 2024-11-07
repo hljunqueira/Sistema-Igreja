@@ -89,7 +89,16 @@ exports.register = async (req, res) => {
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const { name, email, password } = req.body;
+    const {
+      name,
+      email,
+      password,
+      phone,
+      birth_date,
+      is_baptized,
+      baptism_date,
+      user_type = "visitante",
+    } = req.body;
 
     // Verificar se o usuário já existe
     const existingUser = await getUserByEmail(email);
@@ -99,7 +108,24 @@ exports.register = async (req, res) => {
 
     // Criar um novo usuário
     const hashedPassword = await bcrypt.hash(password, 10);
-    const newUser = await createUser({ name, email, password: hashedPassword });
+
+    const newUser = await createUser({
+      name,
+      email,
+      password: hashedPassword,
+      user_type,
+      phone,
+      birth_date,
+      is_baptized,
+      baptism_date,
+    });
+
+    // Gerar token JWT
+    const token = jwt.sign(
+      { userId: newUser.id, userType: newUser.user_type },
+      process.env.JWT_SECRET,
+      { expiresIn: "1h" }
+    );
 
     res.status(201).json({
       message: "Usuário registrado com sucesso",
@@ -109,10 +135,14 @@ exports.register = async (req, res) => {
         email: newUser.email,
         user_type: newUser.user_type,
       },
+      token,
     });
   } catch (error) {
     console.error("Erro ao registrar usuário:", error);
-    res.status(500).json({ message: "Erro ao registrar usuário" });
+    res.status(500).json({
+      message: "Erro ao registrar usuário",
+      error: process.env.NODE_ENV === "development" ? error.message : undefined,
+    });
   }
 };
 
@@ -135,7 +165,7 @@ exports.getUser = async (req, res) => {
     });
   } catch (error) {
     console.error("Erro ao obter informações do usuário:", error);
-    res.status(500).json({ message: " Erro ao obter informações do usuário" });
+    res.status(500).json({ message: "Erro ao obter informações do usuário" });
   }
 };
 
@@ -143,7 +173,6 @@ exports.forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
     // Lógica para enviar email de recuperação de senha
-    // Exemplo: gerar um token e enviar um email com o link para redefinição de senha
     res.json({ message: "Email de recuperação enviado" });
   } catch (error) {
     console.error("Erro ao enviar email de recuperação:", error);

@@ -1,6 +1,9 @@
+// src/Routes.js
 import React from "react";
 import { Route, Routes, Navigate } from "react-router-dom";
-import { useAuth } from "./contexts/AuthContext"; // Importar o contexto de autenticação
+import { useAuth } from "./contexts/AuthContext";
+import EventList from "./components/Events/EventList";
+import PublicEventList from "./components/Events/PublicEventList";
 import Login from "./components/Login/Login";
 import Register from "./components/Register/Register";
 import Home from "./components/Home/Home";
@@ -18,7 +21,18 @@ const PrivateRoute = ({ children }) => {
   return user ? children : <Navigate to="/login" />; // Redireciona se não estiver autenticado
 };
 
+// Componente para rota protegida de admin
+const AdminRoute = ({ children }) => {
+  const { user } = useAuth();
+  if (!user || user.user_type !== "administrador") {
+    return <Navigate to="/events" />;
+  }
+  return children;
+};
+
 const AppRoutes = () => {
+  const { user } = useAuth();
+
   return (
     <Routes>
       <Route path="/" element={<Navigate to="/login" />} />
@@ -26,6 +40,7 @@ const AppRoutes = () => {
       <Route path="/register" element={<Register />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password/:token" element={<ResetPassword />} />
+
       <Route
         path="/home"
         element={
@@ -61,19 +76,34 @@ const AppRoutes = () => {
       <Route
         path="/admin/users"
         element={
-          <PrivateRoute>
+          <AdminRoute>
             <AdminUsers />
-          </PrivateRoute>
+          </AdminRoute>
         }
       />
       <Route
         path="/admin/settings"
         element={
-          <PrivateRoute>
+          <AdminRoute>
             <AdminSettings />
-          </PrivateRoute>
+          </AdminRoute>
         }
       />
+
+      {/* Rota de eventos */}
+      <Route
+        path="/events"
+        element={
+          user?.user_type === "administrador" ? (
+            <AdminRoute>
+              <EventList />
+            </AdminRoute>
+          ) : (
+            <PublicEventList />
+          )
+        }
+      />
+
       {/* Adicione outras rotas conforme necessário */}
     </Routes>
   );

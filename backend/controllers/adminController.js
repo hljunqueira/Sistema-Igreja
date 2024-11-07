@@ -1,5 +1,3 @@
-// C:\sistema-igreja\backend\controllers\adminController.js
-
 const { pool } = require("../config/db");
 
 // Função para listar todos os usuários
@@ -148,6 +146,7 @@ exports.savePastorInfo = async (req, res) => {
   }
 };
 
+// Fun ```javascript
 // Função para salvar informações do líder
 exports.saveLiderInfo = async (req, res) => {
   try {
@@ -171,6 +170,32 @@ exports.saveLiderInfo = async (req, res) => {
       message: "Erro ao salvar informações do líder",
       error: error.message,
     });
+  }
+};
+
+// Função para atualizar o status do usuário
+exports.updateUserStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    const result = await pool.query(
+      `UPDATE users 
+       SET status = $1, 
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $2 
+       RETURNING id, name, email, user_type, status`,
+      [status, id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: "Usuário não encontrado" });
+    }
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error("Erro ao atualizar status do usuário:", error);
+    res.status(500).json({ message: "Erro ao atualizar status do usuário" });
   }
 };
 

@@ -49,5 +49,11 @@ router.post(
   authorizationMiddleware(["administrador"]),
   adminController.saveLiderInfo
 );
+router.put(
+  "/users/:id/status",
+  authMiddleware,
+  authorizationMiddleware(["administrador"]),
+  adminController.updateUserStatus
+);
 
 module.exports = router;
