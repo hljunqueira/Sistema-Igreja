@@ -98,7 +98,7 @@ export const registerUser = async (userData) => {
     const response = await api.post("/auth/register", userData);
     return response.data;
   } catch (error) {
-    console.error(" Erro no registro:", error);
+    console.error("Erro no registro:", error);
     throw new Error(
       error.response?.data?.message || "Erro ao registrar usuário"
     );

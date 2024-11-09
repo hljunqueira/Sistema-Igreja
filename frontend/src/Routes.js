@@ -1,4 +1,3 @@
-// src/Routes.js
 import React from "react";
 import { Route, Routes, Navigate } from "react-router-dom";
 import { useAuth } from "./contexts/AuthContext";
@@ -17,8 +16,8 @@ import ResetPassword from "./components/ResetPassword/ResetPassword";
 
 // Componente para rota privada
 const PrivateRoute = ({ children }) => {
-  const { user } = useAuth(); // Obtém informações do usuário do contexto
-  return user ? children : <Navigate to="/login" />; // Redireciona se não estiver autenticado
+  const { user } = useAuth();
+  return user ? children : <Navigate to="/login" />;
 };
 
 // Componente para rota protegida de admin
@@ -90,7 +89,6 @@ const AppRoutes = () => {
         }
       />
 
-      {/* Rota de eventos */}
       <Route
         path="/events"
         element={
@@ -103,8 +101,6 @@ const AppRoutes = () => {
           )
         }
       />
-
-      {/* Adicione outras rotas conforme necessário */}
     </Routes>
   );
 };
